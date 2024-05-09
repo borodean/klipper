@@ -4,6 +4,10 @@
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
 import os, re, logging, collections, shlex
+import sys
+if sys.version_info.major == 2:
+    reload(sys)
+    sys.setdefaultencoding('utf8')
 
 class CommandError(Exception):
     pass
@@ -111,6 +115,7 @@ class GCodeDispatch:
             func = getattr(self, 'cmd_' + cmd)
             desc = getattr(self, 'cmd_' + cmd + '_help', None)
             self.register_command(cmd, func, True, desc)
+        self.exclude_object_info = "/mnt/UDISK/.crealityprint/exclude_object_info.json"
     def is_traditional_gcode(self, cmd):
         # A "traditional" g-code command is a letter and followed by a number
         try:
@@ -209,9 +214,41 @@ class GCodeDispatch:
                 if not need_ack:
                     raise
             gcmd.ack()
+            if line.startswith("G1") or line.startswith("G0"):
+                pass
+            elif line.startswith("EXCLUDE_OBJECT_DEFINE") or line.startswith("EXCLUDE_OBJECT NAME"):
+                self.record_exclude_object_info(line)
+    def record_exclude_object_info(self, line):
+        import json
+        try:
+            if not os.path.exists(self.exclude_object_info):
+                with open(self.exclude_object_info, "w") as f:
+                    data = {}
+                    data["EXCLUDE_OBJECT_DEFINE"] = []
+                    data["EXCLUDE_OBJECT"] = []
+                    f.write(json.dumps(data))
+                    f.flush()
+            with open(self.exclude_object_info, "r") as f:
+                ret = f.read()
+                if len(ret) > 0:
+                    ret = eval(ret)
+                else:
+                    ret = {}
+            if line.startswith("EXCLUDE_OBJECT_DEFINE"):
+                ret["EXCLUDE_OBJECT_DEFINE"].append(line)
+            elif line.startswith("EXCLUDE_OBJECT NAME"):
+                ret["EXCLUDE_OBJECT"].append(line)
+            with open(self.exclude_object_info, "w") as f:
+                f.write(json.dumps(ret))
+                f.flush()
+        except Exception as err:
+            logging.error("record_exclude_object_info error: %s" % err)
     def run_script_from_command(self, script):
         self._process_commands(script.split('\n'), need_ack=False)
     def run_script(self, script):
+        if script == "CANCEL_PRINT":
+            virtual_sdcard = self.printer.lookup_object('virtual_sdcard', None)
+            virtual_sdcard.cancel_print_state = True
         with self.mutex:
             self._process_commands(script.split('\n'), need_ack=False)
     def get_mutex(self):
@@ -233,6 +270,7 @@ class GCodeDispatch:
         if len(lines) > 1:
             self.respond_info("\n".join(lines), log=False)
         self.respond_raw('!! %s' % (lines[0].strip(),))
+
         if self.is_fileinput:
             self.printer.request_exit('error_exit')
     def _respond_state(self, state):
@@ -243,8 +281,17 @@ class GCodeDispatch:
         r'(?P<cmd>[a-zA-Z_][a-zA-Z0-9_]+)(?:\s+|$)'
         r'(?P<args>[^#*;]*?)'
         r'\s*(?:[#*;].*)?$')
+    extended_r1 = re.compile(
+        r'^\s*(?:N[0-9]+\s*)?'
+        r'(?P<cmd>[a-zA-Z_][a-zA-Z0-9_]+)(?:\s+|$)'
+        r'(?P<args>[^\|*;]*?)'
+        r'\s*(?:[\|*;].*)?$')
     def _get_extended_params(self, gcmd):
-        m = self.extended_r.match(gcmd.get_commandline())
+        if gcmd.get_commandline().startswith("SDCARD_PRINT_FILE"):
+            # Support filename contain '#'
+            m = self.extended_r1.match(gcmd.get_commandline())
+        else:
+            m = self.extended_r.match(gcmd.get_commandline())
         if m is None:
             raise self.error("Malformed command '%s'"
                              % (gcmd.get_commandline(),))
@@ -261,6 +308,9 @@ class GCodeDispatch:
     # G-Code special command handlers
     def cmd_default(self, gcmd):
         cmd = gcmd.get_command()
+        if cmd == 'M5':
+            # return if M5 gcode_marco not exists
+            return
         if cmd == 'M105':
             # Don't warn about temperature requests when not ready
             gcmd.ack("T:0")
@@ -283,8 +333,8 @@ class GCodeDispatch:
                 handler(gcmd)
                 return
         elif cmd in ['M140', 'M104'] and not gcmd.get_float('S', 0.):
-            # Don't warn about requests to turn off heaters when not present
-            return
+                # Don't warn about requests to turn off heaters when not present
+                return
         elif cmd == 'M107' or (cmd == 'M106' and (
                 not gcmd.get_float('S', 1.) or self.is_fileinput)):
             # Don't warn about requests to turn off fan when fan not present
@@ -443,6 +493,7 @@ class GCodeIO:
     def _respond_raw(self, msg):
         if self.pipe_is_active:
             try:
+                # logging.error("++++++++++++++msg:%s" % msg)
                 os.write(self.fd, (msg+"\n").encode())
             except os.error:
                 logging.exception("Write g-code response")

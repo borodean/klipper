@@ -201,8 +201,67 @@ class ManualProbeHelper:
             'z_position_upper': next_pos_val,
         }
         # Find recent positions
-        self.gcode.respond_info("Z position: %s --> %.3f <-- %s"
-                                % (prev_str, z_pos, next_str))
+        import json
+        z_offset = -1000
+        try:
+            path = "/mnt/UDISK/printer_config/printer.cfg"
+            import os
+            import yaml
+            # If it is in multi machine control mode, select the configuration file according to the currently selected USB port
+            if os.path.exists("/etc/init.d/klipper_service.2"):
+                try:
+                    with open("/mnt/UDISK/.crealityprint/multiprinter.yaml", 'r') as f:
+                        multi_printer_info = yaml.load(f.read(), Loader=yaml.Loader)
+                except:
+                    multi_printer_info = {}
+                current_printer = multi_printer_info.get("current_printer", {
+                    "printer_id": 1,
+                    "serial": "/dev/serial/by-id/usb_serial_1",
+                    "moonraker_port": 7125
+                })
+                str_printer_id = str(current_printer.get("printer_id"))
+                if str_printer_id == "1":
+                    pass
+                else:
+                    path = "/mnt/UDISK/printer_config" + str_printer_id + "/printer.cfg"
+
+            with open(path, "r") as f:
+                ret = f.readlines()
+                for obj in ret:
+                    if obj.startswith("#*# z_offset"):
+                        obj = obj.strip("\n")
+                        z_offset = float(obj.split(" ")[-1])
+        except Exception as err:
+            logging.error(err)
+        if z_offset != -1000:
+            if z_offset - z_pos < 0.0:
+                with open("/mnt/UDISK/.crealityprint/z_offset.json", "w+") as f:
+                    msg = {"z_offset_is_ok": False}
+                    f.write(json.dumps(msg))
+                    f.flush()
+            else:
+                with open("/mnt/UDISK/.crealityprint/z_offset.json", "w+") as f:
+                    msg = {"z_offset_is_ok": True}
+                    f.write(json.dumps(msg))
+                    f.flush()
+        else:
+            if 0 > -z_pos:
+                with open("/mnt/UDISK/.crealityprint/z_offset.json", "w+") as f:
+                    msg = {"z_offset_is_ok": False}
+                    f.write(json.dumps(msg))
+                    f.flush()
+            else:
+                with open("/mnt/UDISK/.crealityprint/z_offset.json", "w+") as f:
+                    msg = {"z_offset_is_ok": True}
+                    f.write(json.dumps(msg))
+                    f.flush()
+        # Find recent positions
+        if z_offset != -1000:
+            new_z_offset = z_offset - z_pos
+        else:
+            new_z_offset = 0 - z_pos
+        self.gcode.respond_info("Z position: %s --> %.3f <-- %s, new z_offset --> %.3f"
+                                % (prev_str, z_pos, next_str, new_z_offset))
     cmd_ACCEPT_help = "Accept the current Z position"
     def cmd_ACCEPT(self, gcmd):
         pos = self.toolhead.get_position()

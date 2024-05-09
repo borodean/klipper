@@ -23,29 +23,32 @@ Printer is halted
 """
 
 message_protocol_error1 = """
-This is frequently caused by running an older version of the
-firmware on the MCU(s). Fix by recompiling and flashing the
-firmware.
+This type of error is frequently caused by running an older
+version of the firmware on the micro-controller (fix by
+recompiling and flashing the firmware).
 """
-
 message_protocol_error2 = """
 Once the underlying issue is corrected, use the "RESTART"
 command to reload the config and restart the host software.
+Protocol error connecting to printer
 """
 
 message_mcu_connect_error = """
 Once the underlying issue is corrected, use the
-"FIRMWARE_RESTART" command to reset the firmware, reload the
+FIRMWARE_RESTART command to reset the firmware, reload the
 config, and restart the host software.
 Error configuring printer
 """
 
 message_shutdown = """
 Once the underlying issue is corrected, use the
-"FIRMWARE_RESTART" command to reset the firmware, reload the
+FIRMWARE_RESTART command to reset the firmware, reload the
 config, and restart the host software.
 Printer is shutdown
 """
+
+api_server_index = None
+MULTI_PRINTER_PATH = "/mnt/UDISK/.crealityprint/multiprinter.yaml"
 
 class Printer:
     config_error = configfile.error
@@ -143,35 +146,20 @@ class Printer:
             m.add_printer_objects(config)
         # Validate that there are no undefined parameters in the config file
         pconfig.check_unused_options(config)
-    def _build_protocol_error_message(self, e):
-        host_version = self.start_args['software_version']
-        msg_update = []
-        msg_updated = []
-        for mcu_name, mcu in self.lookup_objects('mcu'):
-            try:
-                mcu_version = mcu.get_status()['mcu_version']
-            except:
-                logging.exception("Unable to retrieve mcu_version from mcu")
-                continue
-            if mcu_version != host_version:
-                msg_update.append("%s: Current version %s"
-                                  % (mcu_name.split()[-1], mcu_version))
-            else:
-                msg_updated.append("%s: Current version %s"
-                                   % (mcu_name.split()[-1], mcu_version))
-        if not msg_update:
-            msg_update.append("<none>")
-        if not msg_updated:
-            msg_updated.append("<none>")
-        msg = ["MCU Protocol error",
-               message_protocol_error1,
-               "Your Klipper version is: %s" % (host_version,),
-               "MCU(s) which should be updated:"]
-        msg += msg_update + ["Up-to-date MCU(s):"] + msg_updated
-        msg += [message_protocol_error2, str(e)]
-        return "\n".join(msg)
+    def _get_versions(self):
+        try:
+            parts = ["%s=%s" % (n.split()[-1], m.get_status()['mcu_version'])
+                     for n, m in self.lookup_objects('mcu')]
+            parts.insert(0, "host=%s" % (self.start_args['software_version'],))
+            return "\nKnown versions: %s\n" % (", ".join(parts),)
+        except:
+            logging.exception("Error in _get_versions()")
+            return ""
     def _connect(self, eventtime):
         try:
+            import threading
+            t = threading.Thread(target=self._record_local_log, args=("reconnect",))
+            t.start()
             self._read_config()
             self.send_event("klippy:mcu_identify")
             for cb in self.event_handlers.get("klippy:connect", []):
@@ -179,12 +167,15 @@ class Printer:
                     return
                 cb()
         except (self.config_error, pins.error) as e:
-            logging.exception("Config error")
             self._set_state("%s\n%s" % (str(e), message_restart))
+            logging.exception("Config error")
             return
         except msgproto.error as e:
             logging.exception("Protocol error")
-            self._set_state(self._build_protocol_error_message(e))
+            self._set_state("%s\n%"
+                            "s%s%s" % (str(e), message_protocol_error1,
+                                          self._get_versions(),
+                                          message_protocol_error2))
             util.dump_mcu_build()
             return
         except mcu.error as e:
@@ -199,6 +190,11 @@ class Printer:
             return
         try:
             self._set_state(message_ready)
+            logging.info("+++++++++++++++printer_ready")
+
+            import threading
+            t = threading.Thread(target=self._record_local_log, args=("printer_ready",))
+            t.start()
             for cb in self.event_handlers.get("klippy:ready", []):
                 if self.state_message is not message_ready:
                     return
@@ -241,9 +237,87 @@ class Printer:
             logging.info(info)
         if self.bglogger is not None:
             self.bglogger.set_rollover_info(name, info)
+
+    def get_yaml_info(self, _config_file=None):
+        """
+        read yaml file info
+        """
+        import yaml
+        # if not _config_file:
+        if not os.path.exists(_config_file):
+            return {}
+        config_data = {}
+        try:
+            with open(_config_file, 'r') as f:
+                config_data = yaml.load(f.read(), Loader=yaml.Loader)
+        except Exception as err:
+            pass
+        return config_data
+
+    def set_yaml_info(self, _config_file=None, data=None):
+        """
+        write yaml file info
+        """
+        import yaml
+        if not _config_file:
+            return
+        try:
+            with open(_config_file, 'w+') as f:
+                yaml.dump(data, f, allow_unicode=True)
+                f.flush()
+            os.system("sync")
+        except Exception as e:
+            pass
+
+    def _record_local_log(self, msg):
+        global api_server_index
+        # if os.path.exists("/etc/init.d/klipper_service.2"):
+        #     multi_printer_info = self.get_yaml_info(MULTI_PRINTER_PATH)
+        #     multi_printer_info_list = multi_printer_info.get("multi_printer_info")
+        #     for printer_info in multi_printer_info_list:
+        #         if str(printer_info.get("printer_id")) == api_server_index:
+        #             if msg == "invoke_shutdown":
+        #                 printer_info["status"] = 0
+        #             elif msg == "printer_ready":
+        #                 printer_info["status"] = 1
+        #             elif msg == "init_status":
+        #                 printer_info["status"] = 0
+        #                 self.set_yaml_info(MULTI_PRINTER_PATH, multi_printer_info)
+        #                 return
+        #             self.set_yaml_info(MULTI_PRINTER_PATH, multi_printer_info)
+        #             break
+
+        if msg == "invoke_shutdown":
+            with open("/mnt/UDISK/.crealityprint/printer%s_stat" % api_server_index, "w+") as f:
+                logging.info("/mnt/UDISK/.crealityprint/printer%s_stat set invoke_shutdown" % api_server_index)
+                f.write("0")
+        elif msg == "printer_ready":
+            logging.info("/mnt/UDISK/.crealityprint/printer%s_stat set printer_ready" % api_server_index)
+            with open("/mnt/UDISK/.crealityprint/printer%s_stat" % api_server_index, "w+") as f:
+                f.write("1")
+        elif msg == "reconnect":
+            logging.info("/mnt/UDISK/.crealityprint/printer%s_stat set reconnect" % api_server_index)
+            with open("/mnt/UDISK/.crealityprint/printer%s_stat" % api_server_index, "w+") as f:
+                f.write("0")
+
+        url = "http://127.0.0.1:8000/settings/machine_info/?method=record_log_to_remote_sererver&message=%s&index=%s" % (
+                msg, api_server_index)
+        logging.info(url)
+        from sys import version_info
+        if version_info.major == 2:
+            import urllib2
+            urllib2.urlopen(url)
+        else:
+            import urllib.request
+            urllib.request.urlopen(url)
+
     def invoke_shutdown(self, msg):
         if self.in_shutdown_state:
             return
+        logging.info("+++++++++++++++invoke_shutdown")
+        import threading
+        t = threading.Thread(target=self._record_local_log, args=("invoke_shutdown",))
+        t.start()
         logging.error("Transition to shutdown state: %s", msg)
         self.in_shutdown_state = True
         self._set_state("%s%s" % (msg, message_shutdown))
@@ -296,6 +370,14 @@ def arg_dictionary(option, opt_str, value, parser):
     parser.values.dictionary[key] = fname
 
 def main():
+    # printer_cfg_obj = "/mnt/UDISK/printer_config/printer.cfg"
+    # if not os.path.exists(printer_cfg_obj) or os.path.getsize(printer_cfg_obj) == 0:
+    #     raise
+    #     os.system("/bin/cp /usr/share/klipper-brain/printer_config/printer.cfg %s && sync" % printer_cfg_obj)
+    # timelapse_cfg_obj = "/mnt/UDISK/printer_config/timelapse.cfg"
+    # if not os.path.exists(timelapse_cfg_obj):
+    #     os.system("/bin/cp /usr/share/klipper-brain/printer_config/timelapse.cfg %s && sync" % timelapse_cfg_obj)
+
     usage = "%prog [options] <config file>"
     opts = optparse.OptionParser(usage)
     opts.add_option("-i", "--debuginput", dest="debuginput",
@@ -317,6 +399,55 @@ def main():
     opts.add_option("--import-test", action="store_true",
                     help="perform an import module test")
     options, args = opts.parse_args()
+    config_path = args[0].replace("//", "/")
+    lines = []
+    is_exclude_object_exists = False
+    exclude_object_flag = "/mnt/UDISK/.crealityprint/%s_exclude_object.txt" % config_path.split("/")[-2]
+    if not os.path.exists(exclude_object_flag):
+        with open(exclude_object_flag, "w") as f:
+            f.write("1")
+            f.flush()
+        with open(config_path, "r") as f:
+            lines = f.readlines()
+        for obj in lines:
+            if obj.startswith("[exclude_object]"):
+                is_exclude_object_exists = True
+        # 文件中没有exclude_object字段
+        if not is_exclude_object_exists:
+            flag = False
+            flag_index = -1
+            with open(config_path, "r") as f:
+                data = f.readlines()
+                for index, obj in enumerate(data):
+                    if obj.startswith("[printer]"):
+                        flag = True
+                    if flag and obj == "\n":
+                        flag_index = index
+                        break
+            if flag_index != -1:
+                data.insert(flag_index, "\n[exclude_object]\n")
+            with open(config_path, "w") as f:
+                f.writelines(data)
+                f.flush()
+    if options.apiserver:
+        index = options.apiserver[-1]
+        global api_server_index
+        if index == "2" or index == "3" or index == "4":
+            api_server_index = index
+            timelapse_cfg_obj = "/mnt/UDISK/printer_config" + index + "/timelapse.cfg"
+            # creality_obj = "/mnt/UDISK/printer_config" + index + "/creality"
+        else:
+            api_server_index = "1"
+            timelapse_cfg_obj = "/mnt/UDISK/printer_config/timelapse.cfg"
+            # creality_obj = "/mnt/UDISK/printer_config/creality"
+        if not os.path.exists(timelapse_cfg_obj):
+            os.system("/bin/cp /usr/share/klipper-brain/printer_config/timelapse.cfg %s && sync" % timelapse_cfg_obj)
+        # if not os.path.exists(creality_obj):
+        #     os.system("/bin/cp -r /usr/share/klipper-brain/printer_config/config/creality %s && sync" % creality_obj)
+
+        with open("/mnt/UDISK/.crealityprint/printer%s_stat" % api_server_index, "w+") as f:
+            logging.info("/mnt/UDISK/.crealityprint/printer%s_stat set init invoke_shutdown status" % api_server_index)
+            f.write("0")
     if options.import_test:
         import_test()
     if len(args) != 1:
@@ -324,7 +455,8 @@ def main():
     start_args = {'config_file': args[0], 'apiserver': options.apiserver,
                   'start_reason': 'startup'}
 
-    debuglevel = logging.INFO
+    # debuglevel = logging.INFO
+    debuglevel = logging.ERROR
     if options.verbose:
         debuglevel = logging.DEBUG
     if options.debuginput:
@@ -341,7 +473,7 @@ def main():
         start_args['log_file'] = options.logfile
         bglogger = queuelogger.setup_bg_logging(options.logfile, debuglevel)
     else:
-        logging.getLogger().setLevel(debuglevel)
+        logging.basicConfig(level=debuglevel, format='[%(levelname)s] %(asctime)s [%(name)s] [%(module)s:%(funcName)s:%(lineno)d] %(message)s')
     logging.info("Starting Klippy...")
     start_args['software_version'] = util.get_git_version()
     start_args['cpu_info'] = util.get_cpu_info()
