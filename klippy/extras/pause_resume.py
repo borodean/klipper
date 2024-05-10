@@ -99,23 +99,18 @@ class PauseResume:
 
     def handle_connect(self):
         self.v_sd = self.printer.lookup_object('virtual_sdcard', None)
-
     def _handle_cancel_request(self, web_request):
         self.gcode.run_script("CANCEL_PRINT")
-
     def _handle_pause_request(self, web_request):
         self.v_sd.power_loss_pause_flag = True
         self.gcode.run_script("PAUSE")
         self.v_sd.power_loss_pause_flag = False
-
     def _handle_resume_request(self, web_request):
         self.gcode.run_script("RESUME")
-
     def get_status(self, eventtime):
         return {
             'is_paused': self.is_paused
         }
-
     def is_sd_active(self):
         return self.v_sd is not None and self.v_sd.is_active()
 
@@ -133,9 +128,7 @@ class PauseResume:
                 self.gcode.respond_info("action:paused")
             self.pause_command_sent = True
             self.printer.lookup_object('toolhead').move_queue.flush()
-
     cmd_PAUSE_help = ("Pauses the current print")
-
     def cmd_PAUSE(self, gcmd):
         import os, time
         reactor = self.printer.get_reactor()
@@ -168,7 +161,6 @@ class PauseResume:
                     f.flush()
             except Exception as err:
                 pass
-
     def send_resume_command(self):
         if self.sd_paused:
             # Printing from virtual sd, run pause command
@@ -191,9 +183,7 @@ class PauseResume:
         self.send_resume_command()
         self.is_paused = False
         self.v_sd.lida_paused = False
-
     cmd_M600_help = ("M600 Pauses the current print")
-
     def cmd_M600(self, gcmd):
         x = gcmd.get_float("X", 0.)
         y = gcmd.get_float("Y", 0.)
@@ -215,10 +205,8 @@ class PauseResume:
             "G0 E%s F6000\n"
             "G92 E0" % (z, x, y, e))
         self.is_paused = True
-
     cmd_CLEAR_PAUSE_help = (
         "Clears the current paused state without resuming the print")
-
     def cmd_CLEAR_PAUSE(self, gcmd):
         self.is_paused = self.pause_command_sent = False
     cmd_CANCEL_PRINT_help = ("Cancel the current print")
@@ -230,7 +218,6 @@ class PauseResume:
         self.cmd_CLEAR_PAUSE(gcmd)
         self.v_sd.cancel_print_state = False
         self.v_sd.pause_flag = 1
-
 
 def load_config(config):
     return PauseResume(config)

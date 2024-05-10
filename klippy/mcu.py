@@ -161,7 +161,6 @@ class MCU_endstop:
                         cerror = self._mcu.get_printer().config_error
                         raise cerror("Multi-mcu homing not supported on"
                                      " multi-mcu shared axis")
-
     def get_steppers(self):
         return [s for trsync in self._trsyncs for s in trsync.get_steppers()]
     def _build_config(self):
@@ -258,7 +257,6 @@ class MCU_digital_out:
         if self._max_duration and self._start_value != self._shutdown_value:
             raise pins.error("Pin with max duration must have start"
                              " value equal to shutdown value")
-
         mdur_ticks = self._mcu.seconds_to_clock(self._max_duration)
         if mdur_ticks >= 1<<31:
             raise pins.error("Digital pin max duration too large")
@@ -609,7 +607,6 @@ class MCU:
         diff = count*tick_sumsq - tick_sum**2
         self._mcu_tick_stddev = c * math.sqrt(max(0., diff))
         self._mcu_tick_awake = tick_sum / self._mcu_freq
-
     def _handle_shutdown(self, params):
         if self._is_shutdown:
             return
@@ -889,7 +886,6 @@ class MCU:
             return
         self._emergency_stop_cmd.send()
         self.usb_reset()
-
     def usb_reset(self):
         usb_id = self._serialport
         from subprocess import check_output

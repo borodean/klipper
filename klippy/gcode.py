@@ -270,7 +270,6 @@ class GCodeDispatch:
         if len(lines) > 1:
             self.respond_info("\n".join(lines), log=False)
         self.respond_raw('!! %s' % (lines[0].strip(),))
-
         if self.is_fileinput:
             self.printer.request_exit('error_exit')
     def _respond_state(self, state):
@@ -333,8 +332,8 @@ class GCodeDispatch:
                 handler(gcmd)
                 return
         elif cmd in ['M140', 'M104'] and not gcmd.get_float('S', 0.):
-                # Don't warn about requests to turn off heaters when not present
-                return
+            # Don't warn about requests to turn off heaters when not present
+            return
         elif cmd == 'M107' or (cmd == 'M106' and (
                 not gcmd.get_float('S', 1.) or self.is_fileinput)):
             # Don't warn about requests to turn off fan when fan not present

@@ -7,6 +7,7 @@ import json
 import logging
 import pins
 from . import manual_probe
+
 HINT_TIMEOUT = """
 If the probe did not move far enough to trigger, then
 consider reducing the Z axis minimum position so the probe

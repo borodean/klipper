@@ -53,26 +53,21 @@ class ConfigWrapper:
             raise self.error("Option '%s' in section '%s' must be below %s"
                              % (option, self.section, below))
         return v
-
     def get(self, option, default=sentinel, note_valid=True):
         return self._get_wrapper(self.fileconfig.get, option, default,
                                  note_valid=note_valid)
-
     def getint(self, option, default=sentinel, minval=None, maxval=None,
                note_valid=True):
         return self._get_wrapper(self.fileconfig.getint, option, default,
                                  minval, maxval, note_valid=note_valid)
-
     def getfloat(self, option, default=sentinel, minval=None, maxval=None,
                  above=None, below=None, note_valid=True):
         return self._get_wrapper(self.fileconfig.getfloat, option, default,
                                  minval, maxval, above, below,
                                  note_valid=note_valid)
-
     def getboolean(self, option, default=sentinel, note_valid=True):
         return self._get_wrapper(self.fileconfig.getboolean, option, default,
                                  note_valid=note_valid)
-
     def getchoice(self, option, choices, default=sentinel, note_valid=True):
         if choices and type(list(choices.keys())[0]) == int:
             c = self.getint(option, default, note_valid=note_valid)
@@ -82,7 +77,6 @@ class ConfigWrapper:
             raise error("Choice '%s' for option '%s' in section '%s'"
                         " is not a valid choice" % (c, option, self.section))
         return choices[c]
-
     def getlists(self, option, default=sentinel, seps=(',',), count=None,
                  parser=str, note_valid=True):
         def lparser(value, pos):
@@ -95,43 +89,33 @@ class ConfigWrapper:
                 raise error("Option '%s' in section '%s' must have %d elements"
                             % (option, self.section, count))
             return tuple(res)
-
         def fcparser(section, option):
             return lparser(self.fileconfig.get(section, option), len(seps) - 1)
-
         return self._get_wrapper(fcparser, option, default,
                                  note_valid=note_valid)
-
     def getlist(self, option, default=sentinel, sep=',', count=None,
                 note_valid=True):
         return self.getlists(option, default, seps=(sep,), count=count,
                              parser=str, note_valid=note_valid)
-
     def getintlist(self, option, default=sentinel, sep=',', count=None,
                    note_valid=True):
         return self.getlists(option, default, seps=(sep,), count=count,
                              parser=int, note_valid=note_valid)
-
     def getfloatlist(self, option, default=sentinel, sep=',', count=None,
                      note_valid=True):
         return self.getlists(option, default, seps=(sep,), count=count,
                              parser=float, note_valid=note_valid)
-
     def getsection(self, section):
         return ConfigWrapper(self.printer, self.fileconfig,
                              self.access_tracking, section)
-
     def has_section(self, section):
         return self.fileconfig.has_section(section)
-
     def get_prefix_sections(self, prefix):
         return [self.getsection(s) for s in self.fileconfig.sections()
                 if s.startswith(prefix)]
-
     def get_prefix_options(self, prefix):
         return [o for o in self.fileconfig.options(self.section)
                 if o.startswith(prefix)]
-
     def deprecate(self, option, value=None):
         if not self.fileconfig.has_option(self.section, option):
             return
@@ -144,13 +128,11 @@ class ConfigWrapper:
         pconfig = self.printer.lookup_object("configfile")
         pconfig.deprecate(self.section, option, value, msg)
 
-
 AUTOSAVE_HEADER = """
 #*# <---------------------- SAVE_CONFIG ---------------------->
 #*# DO NOT EDIT THIS BLOCK OR BELOW. The contents are auto-generated.
 #*#
 """
-
 
 class PrinterConfig:
     def __init__(self, printer):
@@ -176,7 +158,6 @@ class PrinterConfig:
 
     def get_printer(self):
         return self.printer
-
     def _read_config_file(self, filename):
         try:
             f = open(filename, 'r')
@@ -187,7 +168,6 @@ class PrinterConfig:
             logging.exception(msg)
             raise error(msg)
         return data.replace('\r\n', '\n')
-
     def _find_autosave_data(self, data):
         regular_data = data
         autosave_data = ""
@@ -204,7 +184,7 @@ class PrinterConfig:
         for line in autosave_data.split('\n'):
             if ((not line.startswith("#*#")
                  or (len(line) >= 4 and not line.startswith("#*# ")))
-                    and autosave_data):
+                and autosave_data):
                 logging.warn("Can't read autosave from config file"
                              " - modifications after header")
                 return data, ""
