@@ -4,7 +4,7 @@
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
 import logging
-import time
+
 class GCodeMove:
     def __init__(self, config):
         self.printer = printer = config.get_printer()
