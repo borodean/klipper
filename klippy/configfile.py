@@ -155,7 +155,6 @@ class PrinterConfig:
                                desc=self.cmd_SET_ROTATION_DISTANCE_help)
         gcode.register_command("SET_GEAR_RATIO", self.cmd_SET_GEAR_RATIO,
                                desc=self.cmd_SET_GEAR_RATIO_help)
-
     def get_printer(self):
         return self.printer
     def _read_config_file(self, filename):
@@ -514,7 +513,6 @@ class PrinterConfig:
                         rotation_distance_write_state = True
                 if not rotation_distance_write_state:
                     new_lines.insert(start_index + 1, key)
-
                 with open(cfg_path, "w+") as f:
                     f.writelines(new_lines)
                     f.flush()

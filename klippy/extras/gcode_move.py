@@ -278,7 +278,6 @@ class GCodeMove:
         # with open(path, "w") as f:
         #     f.write(json.dumps(data))
         #     f.flush()
-
     cmd_CX_RESTORE_GCODE_STATE_help = "Restore a previously saved G-Code state"
     def cmd_CX_RESTORE_GCODE_STATE(self, path, file_name_path, XYZE):
         try:
@@ -331,7 +330,6 @@ class GCodeMove:
             state["last_position"] = [XYZE["X"], XYZE["Y"], XYZE["Z"], XYZE["E"]+base_position_e]
             logging.info("power_loss cmd_CX_RESTORE_GCODE_STATE state:%s" % str(state))
             logging.info("power_loss cmd_CX_RESTORE_GCODE_STATE self.last_position:%s" % str(self.last_position))
-
             # Restore state
             self.absolute_coord = state['absolute_coord']
             # self.absolute_extrude = state['absolute_extrude']

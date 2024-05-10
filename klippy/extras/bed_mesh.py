@@ -318,7 +318,6 @@ class BedMeshCalibrate:
         self.gcode.register_command(
             'BED_MESH_CALIBRATE', self.cmd_BED_MESH_CALIBRATE,
             desc=self.cmd_BED_MESH_CALIBRATE_help)
-
         if "BED_MESH_SET_DISABLE" not in self.gcode.ready_gcode_handlers:
             self.gcode.register_command(
                 'BED_MESH_SET_DISABLE', self.cmd_BED_MESH_SET_DISABLE,
@@ -327,7 +326,6 @@ class BedMeshCalibrate:
             self.gcode.register_command(
                 'BED_MESH_SET_ENABLE', self.cmd_BED_MESH_SET_ENABLE,
                 desc=self.cmd_BED_MESH_SET_ENABLE_helper)
-
     def cmd_BED_MESH_SET_DISABLE(self, gcmd):
         try:
             if self.bedmesh and self.bedmesh.z_mesh:
@@ -344,7 +342,6 @@ class BedMeshCalibrate:
             pass
         # self.gcode.respond_info("BED_MESH_SET_ENABLE: set isenable=%s id=%s" % (self.bedmesh.z_mesh.isenable, id(self.bedmesh.z_mesh)))
     cmd_BED_MESH_SET_ENABLE_helper = "set MESH enable "
-
     def _generate_points(self, error):
         x_cnt = self.mesh_config['x_count']
         y_cnt = self.mesh_config['y_count']
@@ -959,7 +956,6 @@ class ZMesh:
         return self.mesh_x_min + self.mesh_x_dist * index
     def get_y_coordinate(self, index):
         return self.mesh_y_min + self.mesh_y_dist * index
-
     # def cmd_BED_MESH_SET_DISABLE(self, gcmd):
     #     self.isenable = False
     # cmd_BED_MESH_SET_DISABLE_helper = " set  MESH disable"

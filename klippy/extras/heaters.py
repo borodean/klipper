@@ -253,7 +253,6 @@ class PrinterHeaters:
                 self.can_break = True
             else:
                 pass
-
     def load_config(self, config):
         self.have_load_sensors = True
         # Load default temperature sensors

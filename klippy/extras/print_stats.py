@@ -140,20 +140,17 @@ class PrintStats:
             'info': {'total_layer': self.info_total_layer,
                      'current_layer': self.info_current_layer}
         }
-
     def get_last_total_print_time(self):
         try:
             with open('/mnt/UDISK/.crealityprint/printer%s_totaltime' % self.index) as f:
                 return int(f.read())
         except:
             return 0
-
     def set_total_print_time(self, new_total_print_time):
         try:
             with open('/mnt/UDISK/.crealityprint/printer%s_totaltime' % self.index, "w+") as f:
                 f.write(str(int(new_total_print_time)))
         except:
             pass
-
 def load_config(config):
     return PrintStats(config)

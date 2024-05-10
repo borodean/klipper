@@ -237,7 +237,6 @@ class Printer:
             logging.info(info)
         if self.bglogger is not None:
             self.bglogger.set_rollover_info(name, info)
-
     def get_yaml_info(self, _config_file=None):
         """
         read yaml file info
@@ -253,7 +252,6 @@ class Printer:
         except Exception as err:
             pass
         return config_data
-
     def set_yaml_info(self, _config_file=None, data=None):
         """
         write yaml file info
@@ -268,7 +266,6 @@ class Printer:
             os.system("sync")
         except Exception as e:
             pass
-
     def _record_local_log(self, msg):
         global api_server_index
         # if os.path.exists("/etc/init.d/klipper_service.2"):
@@ -286,7 +283,6 @@ class Printer:
         #                 return
         #             self.set_yaml_info(MULTI_PRINTER_PATH, multi_printer_info)
         #             break
-
         if msg == "invoke_shutdown":
             with open("/mnt/UDISK/.crealityprint/printer%s_stat" % api_server_index, "w+") as f:
                 logging.info("/mnt/UDISK/.crealityprint/printer%s_stat set invoke_shutdown" % api_server_index)
@@ -299,7 +295,6 @@ class Printer:
             logging.info("/mnt/UDISK/.crealityprint/printer%s_stat set reconnect" % api_server_index)
             with open("/mnt/UDISK/.crealityprint/printer%s_stat" % api_server_index, "w+") as f:
                 f.write("0")
-
         url = "http://127.0.0.1:8000/settings/machine_info/?method=record_log_to_remote_sererver&message=%s&index=%s" % (
                 msg, api_server_index)
         logging.info(url)
@@ -310,7 +305,6 @@ class Printer:
         else:
             import urllib.request
             urllib.request.urlopen(url)
-
     def invoke_shutdown(self, msg):
         if self.in_shutdown_state:
             return
@@ -377,7 +371,6 @@ def main():
     # timelapse_cfg_obj = "/mnt/UDISK/printer_config/timelapse.cfg"
     # if not os.path.exists(timelapse_cfg_obj):
     #     os.system("/bin/cp /usr/share/klipper-brain/printer_config/timelapse.cfg %s && sync" % timelapse_cfg_obj)
-
     usage = "%prog [options] <config file>"
     opts = optparse.OptionParser(usage)
     opts.add_option("-i", "--debuginput", dest="debuginput",
