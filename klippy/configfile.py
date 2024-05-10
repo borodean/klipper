@@ -153,6 +153,14 @@ class PrinterConfig:
         gcode = self.printer.lookup_object('gcode')
         gcode.register_command("SAVE_CONFIG", self.cmd_SAVE_CONFIG,
                                desc=self.cmd_SAVE_CONFIG_help)
+        gcode.register_command("CX_SAVE_CONFIG", self.cmd_CX_SAVE_CONFIG,
+                               desc=self.cmd_CX_SAVE_CONFIG_help)
+        gcode.register_command("REMOVE_MCU_RPI_CONFIG", self.cmd_remove_mcu_rpi_CONFIG,
+                               desc=self.cmd_remove_mcu_rpi_CONFIG_help)
+        gcode.register_command("SET_ROTATION_DISTANCE", self.cmd_SET_ROTATION_DISTANCE,
+                               desc=self.cmd_SET_ROTATION_DISTANCE_help)
+        gcode.register_command("SET_GEAR_RATIO", self.cmd_SET_GEAR_RATIO,
+                               desc=self.cmd_SET_GEAR_RATIO_help)
     def get_printer(self):
         return self.printer
     def _read_config_file(self, filename):
@@ -384,8 +392,190 @@ class PrinterConfig:
                     msg = ("SAVE_CONFIG section '%s' option '%s' conflicts "
                            "with included value" % (section, option))
                     raise gcode.error(msg)
+    def disable_mcu_rpi(self, cfg_path):
+        import configparser
+        cp = configparser.ConfigParser()
+        cp.read(cfg_path)
+        sections = cp.sections()
+        rpi_enable = False
+        adxl345_enable = False
+        if "mcu rpi" in sections:
+            rpi_enable = True
+        if "adxl345" in sections:
+            adxl345_enable = True
+        resonance_tester_enable = False
+        if "resonance_tester" in sections:
+            resonance_tester_enable = True
+        if not rpi_enable:
+            return
+        lines = []
+        with open(cfg_path) as f:
+            lines = f.readlines()
+            for index, line in enumerate(lines):
+                if not line.strip():
+                    continue
+                if line.startswith("#"):
+                    continue
+                if "z_offset" in line:
+                    continue
+                if not rpi_enable:
+                    if "[mcu rpi" in line:
+                        rpi_enable = True
+                else:
+                    if "[adxl345" in line:
+                        adxl345_enable = True
+                    else:
+                        if "[resonance_tester" in line:
+                            resonance_tester_enable = True
+                        else:
+                            if "[" in line:
+                                rpi_enable = False
+                                adxl345_enable = False
+                                resonance_tester_enable = False
+                                continue
+                if rpi_enable or adxl345_enable or resonance_tester_enable:
+                    if line.strip() and not line.startswith("#*#"):
+                        new_line = "#" + line
+                        lines[index] = new_line
+
+        with open(cfg_path, "w+") as f:
+            f.writelines(lines)
+
+    cmd_remove_mcu_rpi_CONFIG_help = "Remove mcu_rpi config"
+
+    def cmd_remove_mcu_rpi_CONFIG(self, gcmd):
+        self.remove_section("mcu rpi")
+        self.remove_section("adxl345")
+        self.remove_section("resonance_tester")
+        cfgname = self.printer.get_start_args()['config_file']
+        self.disable_mcu_rpi(cfgname)
+
+    cmd_SET_GEAR_RATIO_help = "Overwrite config file cmd_SET_GEAR_RATIO"
+
+    def cmd_SET_GEAR_RATIO(self, gcmd):
+        if gcmd.get("GEAR_RATIO") == None:
+            return
+        key = "gear_ratio: %s\n" % gcmd.get("GEAR_RATIO")
+        cfg_path = self.printer.get_start_args()['config_file']
+        flag = False
+        start_index = 0
+        end_index = 0
+        with open(cfg_path) as f:
+            lines = f.readlines()
+            for index, line in enumerate(lines):
+                if line.startswith("#"):
+                    continue
+                if line.startswith("[extruder]"):
+                    flag = True
+                    start_index = index
+                if flag == True and line.startswith("[") and not line.startswith("[extruder]"):
+                    end_index = index
+                    break
+            if start_index > 0 and end_index > start_index:
+                import copy
+                new_lines = copy.deepcopy(lines)
+                rotation_distance_write_state = False
+                for index, line in enumerate(lines):
+                    if start_index < index < end_index and line.startswith("gear_ratio"):
+                        new_lines[index] = key
+                        rotation_distance_write_state = True
+                if not rotation_distance_write_state:
+                    new_lines.insert(start_index + 1, key)
+
+                with open(cfg_path, "w+") as f:
+                    f.writelines(new_lines)
+                    f.flush()
+
+    cmd_SET_ROTATION_DISTANCE_help = "Overwrite config file cmd_SET_ROTATION_DISTANCE"
+
+    def cmd_SET_ROTATION_DISTANCE(self, gcmd):
+        if gcmd.get("ROTATION_DISTANCE") == None:
+            return
+        key = "rotation_distance: %s\n" % gcmd.get("ROTATION_DISTANCE")
+        cfg_path = self.printer.get_start_args()['config_file']
+        flag = False
+        start_index = 0
+        end_index = 0
+        with open(cfg_path) as f:
+            lines = f.readlines()
+            for index, line in enumerate(lines):
+                if line.startswith("#"):
+                    continue
+                if line.startswith("[extruder]"):
+                    flag = True
+                    start_index = index
+                if flag == True and line.startswith("[") and not line.startswith("[extruder]"):
+                    end_index = index
+                    break
+            if start_index > 0 and end_index > start_index:
+                import copy
+                new_lines = copy.deepcopy(lines)
+                rotation_distance_write_state = False
+                for index, line in enumerate(lines):
+                    if start_index < index < end_index and line.startswith("rotation_distance"):
+                        new_lines[index] = key
+                        rotation_distance_write_state = True
+                if not rotation_distance_write_state:
+                    new_lines.insert(start_index + 1, key)
+                with open(cfg_path, "w+") as f:
+                    f.writelines(new_lines)
+                    f.flush()
+
     cmd_SAVE_CONFIG_help = "Overwrite config file and restart"
+
     def cmd_SAVE_CONFIG(self, gcmd):
+        if not self.autosave.fileconfig.sections():
+            return
+        gcode = self.printer.lookup_object('gcode')
+        # Create string containing autosave data
+        autosave_data = self._build_config_string(self.autosave)
+        lines = [('#*# ' + l).strip()
+                 for l in autosave_data.split('\n')]
+        lines.insert(0, "\n" + AUTOSAVE_HEADER.rstrip())
+        lines.append("")
+        autosave_data = '\n'.join(lines)
+        # Read in and validate current config file
+        cfgname = self.printer.get_start_args()['config_file']
+        try:
+            data = self._read_config_file(cfgname)
+            regular_data, old_autosave_data = self._find_autosave_data(data)
+            config = self._build_config_wrapper(regular_data, cfgname)
+        except error as e:
+            msg = "Unable to parse existing config on SAVE_CONFIG"
+            logging.exception(msg)
+            raise gcode.error(msg)
+        regular_data = self._strip_duplicates(regular_data, self.autosave)
+        self._disallow_include_conflicts(regular_data, cfgname, gcode)
+        data = regular_data.rstrip() + autosave_data
+        # Determine filenames
+        datestr = time.strftime("-%Y%m%d_%H%M%S")
+        backup_name = cfgname + datestr
+        temp_name = cfgname + "_autosave"
+        if cfgname.endswith(".cfg"):
+            backup_name = cfgname[:-4] + datestr + ".cfg"
+            temp_name = cfgname[:-4] + "_autosave.cfg"
+        # Create new config file with temporary name and swap with main config
+        logging.info("SAVE_CONFIG to '%s' (backup in '%s')",
+                     cfgname, backup_name)
+        try:
+            f = open(temp_name, 'w')
+            f.write(data)
+            f.close()
+            os.system("sync")
+            os.rename(cfgname, backup_name)
+            os.system("sync")
+            os.rename(temp_name, cfgname)
+            os.system("sync")
+        except:
+            msg = "Unable to write config file during SAVE_CONFIG"
+            logging.exception(msg)
+            raise gcode.error(msg)
+        # Request a restart
+        gcode.request_restart('restart')
+
+    cmd_CX_SAVE_CONFIG_help = "Overwrite config file and do not restart"
+
+    def cmd_CX_SAVE_CONFIG(self, gcmd):
         if not self.autosave.fileconfig.sections():
             return
         gcode = self.printer.lookup_object('gcode')
@@ -425,9 +615,8 @@ class PrinterConfig:
             f.close()
             os.rename(cfgname, backup_name)
             os.rename(temp_name, cfgname)
+            os.system("sync")
         except:
             msg = "Unable to write config file during SAVE_CONFIG"
             logging.exception(msg)
             raise gcode.error(msg)
-        # Request a restart
-        gcode.request_restart('restart')

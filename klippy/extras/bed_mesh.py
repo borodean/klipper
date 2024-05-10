@@ -92,6 +92,7 @@ class BedMesh:
         self.last_position = [0., 0., 0., 0.]
         self.bmc = BedMeshCalibrate(config, self)
         self.z_mesh = None
+        self.z_mesh_bak = None
         self.toolhead = None
         self.horizontal_move_z = config.getfloat('horizontal_move_z', 5.)
         self.fade_start = config.getfloat('fade_start', 1.)
@@ -121,6 +122,12 @@ class BedMesh:
         self.gcode.register_command(
             'BED_MESH_OFFSET', self.cmd_BED_MESH_OFFSET,
             desc=self.cmd_BED_MESH_OFFSET_help)
+        self.gcode.register_command(
+            'BED_MESH_SAVE', self.cmd_BED_MESH_SAVE,
+            desc=self.cmd_BED_MESH_SAVE_help)
+        self.gcode.register_command(
+            'BED_MESH_RESTORE', self.cmd_BED_MESH_RESTORE,
+            desc=self.cmd_BED_MESH_RESTORE_help)
         # Register transform
         gcode_move = self.printer.load_object(config, 'gcode_move')
         gcode_move.set_move_transform(self)
@@ -282,7 +289,13 @@ class BedMesh:
             gcode_move.reset_last_position()
         else:
             gcmd.respond_info("No mesh loaded to offset")
-
+    cmd_BED_MESH_SAVE_help = "Save the Mesh to bak"
+    def cmd_BED_MESH_SAVE(self, gcmd):
+        if self.z_mesh is not None:
+            self.z_mesh_bak = self.z_mesh
+    cmd_BED_MESH_RESTORE_help = "Restore the bak Mesh to Mesh"
+    def cmd_BED_MESH_RESTORE(self, gcmd):
+        self.set_mesh(self.z_mesh_bak)
 
 class ZrefMode:
     DISABLED = 0  # Zero reference disabled
@@ -317,6 +330,28 @@ class BedMeshCalibrate:
         self.gcode.register_command(
             'BED_MESH_CALIBRATE', self.cmd_BED_MESH_CALIBRATE,
             desc=self.cmd_BED_MESH_CALIBRATE_help)
+        if "BED_MESH_SET_DISABLE" not in self.gcode.ready_gcode_handlers:
+            self.gcode.register_command(
+                'BED_MESH_SET_DISABLE', self.cmd_BED_MESH_SET_DISABLE,
+                desc=self.cmd_BED_MESH_SET_DISABLE_helper)
+        if "BED_MESH_SET_ENABLE" not in self.gcode.ready_gcode_handlers:
+            self.gcode.register_command(
+                'BED_MESH_SET_ENABLE', self.cmd_BED_MESH_SET_ENABLE,
+                desc=self.cmd_BED_MESH_SET_ENABLE_helper)
+    def cmd_BED_MESH_SET_DISABLE(self, gcmd):
+        try:
+            if self.bedmesh and self.bedmesh.z_mesh:
+                self.bedmesh.z_mesh.isenable = False
+        except:
+            pass
+    cmd_BED_MESH_SET_DISABLE_helper = " set MESH disable"
+    def cmd_BED_MESH_SET_ENABLE(self, gcmd):
+        try:
+            if self.bedmesh and self.bedmesh.z_mesh:
+                self.bedmesh.z_mesh.isenable = True
+        except:
+            pass
+    cmd_BED_MESH_SET_ENABLE_helper = "set MESH enable "
     def _generate_points(self, error, probe_method="automatic"):
         x_cnt = self.mesh_config['x_count']
         y_cnt = self.mesh_config['y_count']
@@ -858,7 +893,7 @@ class BedMeshCalibrate:
                         "Probed table length: %d Probed Table:\n%s") %
                     (len(probed_matrix), str(probed_matrix)))
 
-        z_mesh = ZMesh(params, self._profile_name)
+        z_mesh = ZMesh(params, self._profile_name, self.printer)
         try:
             z_mesh.build_mesh(probed_matrix)
         except BedMeshError as e:
@@ -957,8 +992,10 @@ class MoveSplitter:
 
 
 class ZMesh:
-    def __init__(self, params, name):
+    def __init__(self, params, name, printer):
         self.profile_name = name or "adaptive-%X" % (id(self),)
+        self.printer = printer
+        self.isenable = True
         self.probed_matrix = self.mesh_matrix = None
         self.mesh_params = params
         self.mesh_offsets = [0., 0.]
@@ -995,6 +1032,7 @@ class ZMesh:
                            (self.mesh_x_count - 1)
         self.mesh_y_dist = (self.mesh_y_max - self.mesh_y_min) / \
                            (self.mesh_y_count - 1)
+        self.gcode = self.printer.lookup_object('gcode')
     def get_mesh_matrix(self):
         if self.mesh_matrix is not None:
             return [[round(z, 6) for z in line]
@@ -1063,16 +1101,18 @@ class ZMesh:
     def get_y_coordinate(self, index):
         return self.mesh_y_min + self.mesh_y_dist * index
     def calc_z(self, x, y):
-        if self.mesh_matrix is not None:
-            tbl = self.mesh_matrix
-            tx, xidx = self._get_linear_index(x + self.mesh_offsets[0], 0)
-            ty, yidx = self._get_linear_index(y + self.mesh_offsets[1], 1)
-            z0 = lerp(tx, tbl[yidx][xidx], tbl[yidx][xidx+1])
-            z1 = lerp(tx, tbl[yidx+1][xidx], tbl[yidx+1][xidx+1])
-            return lerp(ty, z0, z1)
-        else:
-            # No mesh table generated, no z-adjustment
-            return 0.
+        if self.isenable:
+            if self.mesh_matrix is not None:
+                tbl = self.mesh_matrix
+                tx, xidx = self._get_linear_index(x + self.mesh_offsets[0], 0)
+                ty, yidx = self._get_linear_index(y + self.mesh_offsets[1], 1)
+                z0 = lerp(tx, tbl[yidx][xidx], tbl[yidx][xidx+1])
+                z1 = lerp(tx, tbl[yidx+1][xidx], tbl[yidx+1][xidx+1])
+                return lerp(ty, z0, z1)
+            else:
+                # No mesh table generated, no z-adjustment
+                pass
+        return 0.
     def get_z_range(self):
         if self.mesh_matrix is not None:
             mesh_min = min([min(x) for x in self.mesh_matrix])
@@ -1351,11 +1391,13 @@ class ProfileManager:
     def load_profile(self, prof_name):
         profile = self.profiles.get(prof_name, None)
         if profile is None:
+            if "default" == prof_name:
+                return
             raise self.gcode.error(
                 "bed_mesh: Unknown profile [%s]" % prof_name)
         probed_matrix = profile['points']
         mesh_params = profile['mesh_params']
-        z_mesh = ZMesh(mesh_params, prof_name)
+        z_mesh = ZMesh(mesh_params, prof_name, self.printer)
         try:
             z_mesh.build_mesh(probed_matrix)
         except BedMeshError as e:
