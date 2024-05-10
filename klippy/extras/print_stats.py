@@ -151,5 +151,6 @@ class PrintStats:
                 f.write(str(int(new_total_print_time)))
         except:
             pass
+
 def load_config(config):
     return PrintStats(config)

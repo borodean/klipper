@@ -224,7 +224,6 @@ class ManualProbeHelper:
                     pass
                 else:
                     path = "/mnt/UDISK/printer_config" + str_printer_id + "/printer.cfg"
-
             with open(path, "r") as f:
                 ret = f.readlines()
                 for obj in ret:

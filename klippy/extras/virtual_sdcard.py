@@ -7,6 +7,7 @@ import os, logging, io
 from subprocess import check_output
 import threading
 import json, time
+
 VALID_GCODE_EXTS = ['gcode', 'g', 'gco']
 LAYER_KEYS = [";LAYER:", "; layer:", "; LAYER:", ";AFTER_LAYER_CHANGE"]
 
@@ -65,17 +66,13 @@ class VirtualSD:
         self.toolhead_moved = False
         self.lida_paused = False
         self.first_layer_start = False
-
         self.flow_complete_status = False
         self.first_layer_complete_status1 = False
         self.first_layer_complete_status2 = False
         self.is_lida_error_paused = False
-
         self.is_open_ai_foregin_matter = False
-
         self.print_id = ""
         self.cur_print_data = {}
-
     def deal_first_layer_complete_status1(self):
         logging.info("lida deal_first_layer_complete_status1 start")
         if self.printer.in_shutdown_state:
@@ -96,7 +93,6 @@ class VirtualSD:
             logging.info("lida deal_first_layer_complete_status1 complete")
         except Exception as e:
             logging.exception(e)
-
     def deal_first_layer_complete_status2(self):
         logging.info("lida deal_first_layer_complete_status2 start")
         if self.printer.in_shutdown_state:
@@ -115,7 +111,6 @@ class VirtualSD:
                 new_url = parse.quote(url, safe=string.printable)  # aviod SSL verification
                 response = urllib.request.urlopen(new_url, timeout=timeout)
             result = int(json.loads(response.read()).get("data"))
-
             logging.info("lida deal_first_layer_complete_status2 complete result=%s" % result)
             if result != 0:
                 lida_config = self.get_yaml_info("/mnt/UDISK/.crealityprint/lida_config.yaml")
@@ -127,7 +122,6 @@ class VirtualSD:
         except Exception as e:
             logging.exception(e)
         self.first_layer_complete_status2 = True
-
     def handle_shutdown(self):
         if self.work_timer is not None:
             self.must_pause_work = True
@@ -288,19 +282,16 @@ class VirtualSD:
         except:
             pass
         self.do_resume()
-
     def get_print_file_metadata(self, filename, filepath="/mnt/UDISK/.crealityprint/upload"):
         from subprocess import check_output
         result = {}
         python_env = "/usr/share/klippy-env/bin/python3"
-        # -f gcode filename  -p gcode file dir
         cmd = "%s /usr/share/klipper/klippy/extras/metadata.py -f '%s' -p %s" % (python_env, filename, filepath)
         try:
             result = json.loads(check_output(cmd, shell=True).decode("utf-8"))
         except Exception as err:
             logging.error(err)
         return result
-
     def record_print_history(self, file_path=""):
         try:
             if os.path.exists(file_path):
@@ -327,7 +318,6 @@ class VirtualSD:
                 return
         except Exception as err:
             logging.error(err)
-
     def update_print_history_info(self, only_update_status=False, state="", error_msg=""):
         if self.print_id:
             ret = {}
@@ -354,14 +344,12 @@ class VirtualSD:
                             if only_update_status and self.print_id and (state == "error" or state == "completed") and os.path.exists("/dev/video0"):
                                 update_obj["jpg_filename"] = "%s.jpg" % self.print_id
                                 time.sleep(0.2)
-
                 if index != -1:
                     print_list[index] = update_obj
                     ret["jobs"] = print_list
                     self.cur_print_data = ret
             except Exception as err:
                 logging.error(err)
-
     def cmd_M20(self, gcmd):
         # List SD card
         files = self.get_file_list()
@@ -400,7 +388,6 @@ class VirtualSD:
             fsize = f.tell()
             f.seek(0)
         except Exception as e:
-            # logging.exception("virtual_sdcard file open")
             logging.exception(e)
             raise gcmd.error("Unable to open file")
         gcmd.respond_raw("File opened:%s Size:%d" % (filename, fsize))
@@ -411,7 +398,6 @@ class VirtualSD:
         self.file_size = fsize
         self.print_stats.set_current_file(filename)
         return fname
-
     def lida_detect(self, fname):
         try:
             url = "http://127.0.0.1/control/command?method=lida_first_layer_detect&filename=%s" % (
@@ -434,7 +420,6 @@ class VirtualSD:
             self.gcode.respond_info("lida_first_layer_detect result is %s" % j_data.get("data").get("first_layer_result"))
         except Exception as e:
             logging.exception(e)
-
     def cmd_M24(self, gcmd):
         # Start/resume SD print
         self.do_resume()
@@ -460,11 +445,9 @@ class VirtualSD:
         self.next_file_position = pos
     def is_cmd_from_sd(self):
         return self.cmd_from_sd
-
     def record_status(self, path, line_pos):
         gcode_move = self.printer.lookup_object('gcode_move')
         gcode_move.cmd_CX_SAVE_GCODE_STATE(self.file_position, path, line_pos)
-
     def create_video(self):
         try:
             if not self.create_video_params.get("enable_delay_photography", True):
@@ -482,9 +465,7 @@ class VirtualSD:
             from datetime import datetime
             now = datetime.now()
             date_time = now.strftime("%Y%m%d_%H%M")
-            # 20220121010735@False@1@15@.mp4
             camera_site = True if timelapse_postion == 1 else False
-            # filename_extend = f"@{camera_site}@{frequency}@{output_framerate}@"
             play_times = int(layer_count / int(frequency) / output_framerate)
             filename_extend = "@%s@%s@%s@%s@" % (camera_site, frequency, output_framerate, play_times)
             outfile = "timelapse_%s_%s%s" % (filename, date_time, filename_extend)
@@ -501,7 +482,6 @@ class VirtualSD:
             os.system(base_shoot_path_cmd)
         except Exception as e:
             logging.exception(e)
-
     def tail_read(self, f):
         cur_pos = f.tell()
         buf = ''
@@ -523,7 +503,6 @@ class VirtualSD:
             if (buf.startswith("G1") or buf.startswith("G0") or buf.startswith(";")) and buf.endswith("\n"):
                 break
         return buf
-
     def getXYZE(self, file_path, file_position):
         result = {"X": 0, "Y": 0, "Z": 0, "E": 0}
         try:
@@ -562,7 +541,6 @@ class VirtualSD:
         except Exception as err:
             logging.exception(err)
         return result
-
     def get_print_temperature(self, file_path):
         import re
         bed = 0
@@ -600,7 +578,6 @@ class VirtualSD:
             nozzle = 200
             logging.error(err)
         return bed, nozzle
-
     def check_slr_camera(self):
         slr_camera = "/mnt/UDISK/.crealityprint/slr_camera.yaml"
         is_gphoto2 = False
@@ -625,11 +602,6 @@ class VirtualSD:
                     slr_position = int(slr_config.get('1').get("position", 0))
                     slr_frequency = int(slr_config.get("1").get("frequency", 1))
                     slr_z_upraise = int(slr_config.get("1").get("z_upraise", 1))
-                    # slr_brain_fps = slr_config.get("1").get("fps", "MP4-15")
-                    # if slr_brain_fps == "MP4-15":
-                    #     slr_output_framerate = 15
-                    # else:
-                    #     slr_output_framerate = 25
                     slr_extruder = 0 - float(slr_config.get('1').get("extruder", 3))
                     slr_extruder_speed = int(slr_config.get('1').get("extruder_speed", 40)) * 60
                     if slr_config.get("1").get("usb", "1") != "1":
@@ -643,10 +615,6 @@ class VirtualSD:
                             is_slr_flsun_type = True
                     try:
                         gphoto2_detect = "gphoto2 --auto-detect"
-                        """
-                        Model                          Port
-                        ----------------------------------------------------------
-                        """
                         logging.info(gphoto2_detect)
                         gphoto2_detect_result = check_output(gphoto2_detect, shell=True).decode()
                         logging.info(gphoto2_detect_result)
@@ -671,26 +639,17 @@ class VirtualSD:
             slr_position = 0
             slr_frequency = 1
             slr_z_upraise = 1
-            # slr_output_framerate = 15
             slr_extruder = -3
             slr_extruder_speed = 40 * 60
         return is_gphoto2, slr_position, slr_frequency, is_slr_flsun_type, slr_z_upraise, slr_extruder, slr_extruder_speed
-
     def _capture_slr_gphoto_set_config(self):
-        """gphoto2_set_config = "gphoto2 --set-config capturetarget=1"""
         gphoto2_set_config = "gphoto2 --set-config capturetarget=1"
         logging.info(gphoto2_set_config)
         os.system(gphoto2_set_config)
-
     def capture_slr_gphoto_set_config(self):
         t = threading.Thread(target=self._capture_slr_gphoto_set_config)
         t.start()
-
     def _capture_slr_gphoto(self):
-        """
-        logging.info(gphoto2_set_config)
-        os.system(gphoto2_set_config)``
-        """
         try:
             gphoto2_capture_image = "gphoto2 --capture-image"
             logging.info(gphoto2_capture_image)
@@ -699,17 +658,13 @@ class VirtualSD:
                 self.gcode.respond_info("gphoto2 --capture-image error: %s" % gphoto2_capture_image_value)
             else:
                 logging.info("gphoto2 --capture-image info: %s" % gphoto2_capture_image_value)
-            # os.system(gphoto2_capture_image)
         except Exception as e:
             self.gcode.respond_info("gphoto2 --capture-image error: %s" % e)
             logging.exception(e)
-
     def capture_slr_gphoto(self):
         t = threading.Thread(target=self._capture_slr_gphoto)
         t.start()
-
     def flow_detect(self):
-        # flow_detect
         logging.info("lida flow detect start")
         if self.printer.in_shutdown_state:
             return
@@ -729,7 +684,6 @@ class VirtualSD:
             logging.info("lida flow detect complete")
         except Exception as e:
             logging.exception(e)
-
     # Background work timer
     def work_handler(self, eventtime):
         self.count_line = 0
@@ -740,7 +694,6 @@ class VirtualSD:
             if not os.path.exists("/dev/ttyLaser"):
                 self.gcode.respond_info("lida not exists")
                 self.first_layer_start = False
-        # self.print_stats.note_start()
         import time
         # read slr camera config
         (is_gphoto2,
@@ -750,7 +703,6 @@ class VirtualSD:
          slr_z_upraise,
          slr_extruder,
          slr_extruder_speed) = self.check_slr_camera()
-        # is_gphoto2 = True
         logging.info("check_slr_camera: is_gphoto2=%s, slr_position=%s, slr_frequency=%s, is_slr_flsun_type=%s, slr_z_upraise=%s, slr_extruder=%s, slr_extruder_speed=%s" % (
             is_gphoto2,
             slr_position,
@@ -768,7 +720,6 @@ class VirtualSD:
             import yaml
             with open("/mnt/UDISK/.crealityprint/time_lapse.yaml") as f:
                 config_data = yaml.load(f.read(), Loader=yaml.Loader)
-            # if timelapse_position == 1 then When the nozzle is moved
             timelapse_postion = int(config_data.get('1').get("position", 0))
             enable_delay_photography = config_data.get('1').get("enable_delay_photography", False)
             frequency = int(config_data.get("1").get("frequency", 1))
@@ -804,7 +755,6 @@ class VirtualSD:
             extruder = -3
             extruder_speed = 40 * 60
             output_framerate = 15
-
         mcu = self.printer.lookup_object('mcu', None)
         pre_serial = mcu._serial.serial_dev.port.split("/")[-1]
         base_shoot_path = "/mnt/UDISK/delayed_imaging/test.264"
@@ -825,12 +775,9 @@ class VirtualSD:
         logging.info(
             "get enable_delay_photography:%s timelapse position is %s" % (enable_delay_photography, timelapse_postion))
         logging.info("Starting SD card print (position %d)", self.file_position)
-
         import threading
         t = threading.Thread(target=self._record_local_log_start_print)
         t.start()
-
-        # path = "/mnt/UDISK/%s_gcode_coordinate.save" % pre_serial
         print_file_name_save_path = "/mnt/UDISK/%s_print_file_name.save" % pre_serial
         path2 = "/mnt/UDISK/.crealityprint/print_switch.txt"
         print_switch = False
@@ -843,8 +790,6 @@ class VirtualSD:
                 pass
 
         state = {}
-        # is_allow_foreign_matter = True
-        # if print_switch and not self.do_resume_status and os.path.exists(path):
         if print_switch and os.path.exists(path) and os.path.exists(print_file_name_save_path) and not self.is_laser_print:
             try:
                     self.print_stats.note_start(info_path=print_file_name_save_path)
@@ -861,7 +806,6 @@ class VirtualSD:
                                     if obj.get("file_position", 0) > info.get("file_position", 0):
                                         info = obj
                         state = info
-                        # state = json.loads(f.read())
                         if not self.do_resume_status:
                             self.file_position = int(state.get("file_position", 0))
                             gcode = self.printer.lookup_object('gcode')
@@ -875,23 +819,17 @@ class VirtualSD:
                         elif self.pause_flag == 1 and self.do_resume_status:
                             pass
                         elif self.cancel_print_state:
-                            # if os.path.exists(path):
-                            #     os.remove(path)
-                            # if os.path.exists(print_file_name_save_path):
-                            #     os.remove(print_file_name_save_path)
                             self.pause_flag = 1
                         elif self.pause_flag == 2 and self.do_resume_status:
                             self.pause_flag = 1
                             gcode_move = self.printer.lookup_object('gcode_move', None)
                             XYZE = self.getXYZE(self.current_file.name, self.file_position)
                             gcode_move.cmd_CX_RESTORE_GCODE_STATE(path, print_file_name_save_path, XYZE)
-                            # is_allow_foreign_matter = False
                         else:
                             self.pause_flag = 1
                             gcode_move = self.printer.lookup_object('gcode_move', None)
                             XYZE = self.getXYZE(self.current_file.name, self.file_position)
                             gcode_move.cmd_CX_RESTORE_GCODE_STATE(path, print_file_name_save_path, XYZE)
-                            # is_allow_foreign_matter = False
             except Exception as err:
                 logging.exception(err)
         else:
@@ -899,22 +837,13 @@ class VirtualSD:
         if print_switch and not self.is_laser_print:
             gcode_move = self.printer.lookup_object('gcode_move')
             gcode_move.recordPrintFileName(print_file_name_save_path, self.current_file.name)
-
-        # if is_allow_foreign_matter:
-        #     self.is_open_ai_foregin_matter = True
-        #     # detect ai foregin matter
-        #     self.detect_ai_foregin_matter()
-        # logging.info("is_open_ai_foregin_matter is %s" % self.is_open_ai_foregin_matter)
         def create_video(timelapse_postion, layer_count, output_framerate, frequency, base_shoot_path,
                          output_pre_video_path):
             try:
-                # outfile = f"timelapse_{gcodefilename}_{date_time}{filename_extend}"
                 from datetime import datetime
                 now = datetime.now()
                 date_time = now.strftime("%Y%m%d_%H%M")
-                # 20220121010735@False@1@15@.mp4
                 camera_site = True if timelapse_postion == 1 else False
-                # filename_extend = f"@{camera_site}@{frequency}@{output_framerate}@"
                 play_times = int(layer_count / int(frequency) / output_framerate)
                 filename_extend = "@%s@%s@%s@%s@" % (camera_site, frequency, output_framerate, play_times)
                 outfile = "timelapse_%s_%s%s" % (filename, date_time, filename_extend)
@@ -931,7 +860,6 @@ class VirtualSD:
                 os.system(base_shoot_path_cmd)
             except Exception as e:
                 logging.exception(e)
-
         self.reactor.unregister_timer(self.work_timer)
         try:
             self.current_file.seek(self.file_position)
@@ -953,9 +881,6 @@ class VirtualSD:
                                     "base_shoot_path": base_shoot_path, "output_pre_video_path": output_pre_video_path,
                                     "filename": filename, "test_jpg_path": test_jpg_path,
                                     "isCurUSB": isCurUSB, "enable_delay_photography": enable_delay_photography}
-
-        # open flsun camera
-        # is_flsun_type = False
         end_filename = self.file_path()
         while not self.must_pause_work:
             if not lines:
@@ -1023,7 +948,6 @@ class VirtualSD:
                         gcode_move.recordPrintFileName(print_file_name_save_path, self.current_file.name, fan_state=self.fan_state, filament_used=self.print_stats.filament_used, last_print_duration=self.print_stats.print_duration)
                     if print_switch and self.count % 29 == 0:
                         gcode_move.recordPrintFileName(print_file_name_save_path, self.current_file.name, fan_state=self.fan_state, filament_used=self.print_stats.filament_used, last_print_duration=self.print_stats.print_duration)
-                    # logging.info(line)
                     if line.startswith("G1") and "E" in line:
                         try:
                             E_str = line.split(" ")[-1]
@@ -1052,18 +976,7 @@ class VirtualSD:
                             break
                     if calc_layer_count == 5:
                         os.system("touch /tmp/layer_count_%s.temp" % self.index)
-
                 if enable_delay_photography == True and video0_status == True and pre_serial == usb_serial:
-                    # wait ai detect foreign matter
-                    # if line.startswith("G28") and self.is_open_ai_foregin_matter:
-                    #     ai_foregin_matter_check_count = 0
-                    #     while os.path.exists("/tmp/ai_foregin_matter.tmp") and ai_foregin_matter_check_count < 15:
-                    #         ai_foregin_matter_check_count += 1
-                    #         self.gcode.respond_info("ai detect foreign matter wait...")
-                    #         logging.info("ai detect foreign matter wait...")
-                    #         self.reactor.pause(self.reactor.monotonic() + 2.0)
-                    #     if os.path.exists("/tmp/ai_foregin_matter.tmp"):
-                    #         os.system("rm /tmp/ai_foregin_matter.tmp")
                     for layer_key in LAYER_KEYS:
                         if ";LAYER_COUNT:" in layer_key:
                             break
@@ -1072,14 +985,11 @@ class VirtualSD:
                                 if not os.path.exists("/dev/video0"):
                                     video0_status = False
                                     continue
-                                # line = "TIMELAPSE_TAKE_FRAME"
                                 logging.info("timelapse_postion: %d" % timelapse_postion)
-                                # logging.info(line)
                                 if timelapse_postion and not is_flsun_type:
                                     if is_gphoto2 and slr_position and frequency == slr_frequency and not is_slr_flsun_type:
                                         self.capture_slr_gphoto_set_config()
                                     from subprocess import call
-                                    # self.toolhead_moved = True
                                     cmd_wait_for_stepper = "M400"
                                     toolhead = self.printer.lookup_object('toolhead')
                                     X, Y, Z, E = toolhead.get_position()
@@ -1091,8 +1001,6 @@ class VirtualSD:
                                         self.gcode.run_script_from_command("G1 F%s E%s" % (extruder_speed, lastE + extruder))
                                         self.gcode.run_script_from_command(cmd_wait_for_stepper)
                                         time.sleep(0.1)
-                                        # if is_flsun_type:
-                                        #     z_upraise = -z_upraise
                                         logging.info("G1 F3000 Z%s" % (Z + z_upraise))
                                         logging.info(cmd_wait_for_stepper)
                                         self.gcode.run_script_from_command("G1 F3000 Z%s" % (Z + z_upraise))
@@ -1101,7 +1009,6 @@ class VirtualSD:
                                             self.timelapse_move(print_file_name_save_path, z_upraise)
                                         time.sleep(0.1)
                                         # 2. move to the specified position
-                                        # cmd = "G0 X5 Y150 F15000"
                                         if is_flsun_type:
                                             cmd = "G0 X0.5 Y98 F15000"
                                         else:
@@ -1111,22 +1018,15 @@ class VirtualSD:
                                         logging.info(cmd_wait_for_stepper)
                                         self.gcode.run_script_from_command(cmd_wait_for_stepper)
                                         try:
-                                            # if not os.path.exists(test_jpg_path):
-                                            #     snapshot_cmd = "wget http://localhost:8080/?action=snapshot -O %s" % test_jpg_path
-                                            #     logging.info(snapshot_cmd)
-                                            #     os.system(snapshot_cmd)
                                             if is_gphoto2 and slr_position and frequency == slr_frequency and not is_slr_flsun_type:
                                                 self.capture_slr_gphoto()
                                                 slr_capture_flag = True
-                                                # self.reactor.pause(self.reactor.monotonic() + 1.5)
                                             elif is_gphoto2 and slr_position and (
                                                     layer_count % int(slr_frequency) == 0
                                             ) and not is_slr_flsun_type:
                                                 self.capture_slr_gphoto()
                                                 slr_capture_flag = True
-                                                # self.reactor.pause(self.reactor.monotonic() + 1.5)
                                             time.sleep(0.5)
-                                            # self.reactor.pause(self.reactor.monotonic() + 0.5)
                                             capture_shell = "capture"
                                             logging.info(capture_shell)
                                             os.system(capture_shell)
@@ -1151,16 +1051,11 @@ class VirtualSD:
                                         time.sleep(0.2)
                                         if print_switch:
                                             gcode_move.recordPrintFileName(print_file_name_save_path, self.current_file.name, fan_state=self.fan_state)
-                                    # self.toolhead_moved = False
                                 else:
                                     try:
                                         capture_shell = "capture &"
                                         logging.info(capture_shell)
                                         os.system(capture_shell)
-                                        # if not os.path.exists(test_jpg_path):
-                                        #     snapshot_cmd = "wget http://localhost:8080/?action=snapshot -O %s" % test_jpg_path
-                                        #     logging.info(snapshot_cmd)
-                                        #     os.system(snapshot_cmd)
                                     except:
                                         pass
                             layer_count += 1
@@ -1197,11 +1092,9 @@ class VirtualSD:
                                         logging.info(cmd)
                                         self.gcode.run_script_from_command(cmd)
                                         logging.info(cmd_wait_for_stepper)
-                                        # time.sleep(0.5)
                                         self.gcode.run_script_from_command(cmd_wait_for_stepper)
                                         self.capture_slr_gphoto()
                                         time.sleep(0.5)
-                                        # self.reactor.pause(self.reactor.monotonic() + 2.)
                                         # 3. move back
                                         move_back_cmd = "G0 X%s Y%s F15000" % (X, Y)
                                         logging.info(move_back_cmd)
@@ -1209,13 +1102,11 @@ class VirtualSD:
                                         self.gcode.run_script_from_command(move_back_cmd)
                                         self.gcode.run_script_from_command(cmd_wait_for_stepper)
                                         time.sleep(0.2)
-                                        # self.reactor.pause(self.reactor.monotonic() + 0.1)
                                         logging.info("G1 F3000 Z%s" % Z)
                                         logging.info(cmd_wait_for_stepper)
                                         self.gcode.run_script_from_command("G1 F3000 Z%s" % Z)
                                         self.gcode.run_script_from_command(cmd_wait_for_stepper)
                                         time.sleep(0.1)
-                                        # self.reactor.pause(self.reactor.monotonic() + 0.1)
                                         logging.info("G1 F%s E%s" % (slr_extruder_speed, lastE))
                                         self.gcode.run_script_from_command("G1 F%s E%s" % (slr_extruder_speed, lastE))
                                         time.sleep(0.2)
@@ -1225,14 +1116,6 @@ class VirtualSD:
                                     self.capture_slr_gphoto()
                             slr_layer_count += 1
                             break
-                # logging.info(line)
-                # if line.startswith(";LAYER:1"):
-                #     lida_config = self.get_yaml_info("/mnt/UDISK/.crealityprint/lida_config.yaml.yaml")
-                #     if lida_config.get("switch") and lida_config.get("printer_id") == self.index:
-                #         self.lida_paused = True
-                #         os.system("touch " + "/tmp/lida_pause_%s" % self.index)
-                #         logging.info("lida first layer detect pause2")
-                #         self.gcode.run_script("PAUSE")
                 self.toolhead_moved = False
                 self.gcode.run_script(line)
                 self.count_line += 1
@@ -1266,8 +1149,6 @@ class VirtualSD:
                                 continue
                             self.gcode.respond_info("lida deal_first_layer_complete_status1 end")
                             self.first_layer_complete_status1 = True
-                            # logging.info("G28")
-                            # self.gcode.run_script("G28")
                 # # first layer print check
                 if self.first_layer_start and self.first_layer_complete_status1 and not self.first_layer_complete_status2 and lida_config.get("printer_id") == self.index:
                     if not os.path.exists("/dev/ttyLaser"):
@@ -1317,23 +1198,17 @@ class VirtualSD:
             create_video(timelapse_postion, layer_count, output_framerate, frequency, base_shoot_path,
                          output_pre_video_path)
         logging.info("Exiting SD card print (position %d)", self.file_position)
-
-        # logging.error("filename:%s end print", self.file_path())
         self.count = 0
         self.count_G1 = 0
         self.count_line = 0
         state = {}
         self.do_resume_status = False
         self.do_cancel_status = False
-
         self.work_timer = None
         self.cmd_from_sd = False
         if error_message is not None:
             self.print_stats.note_error(error_message)
             logging.error("file:" + str(end_filename) + ",error:" + error_message)
-            # import threading
-            # t = threading.Thread(target=self._last_reset_file)
-            # t.start()
         elif self.current_file is not None:
             self.print_stats.note_pause()
         else:
@@ -1346,7 +1221,6 @@ class VirtualSD:
         t = threading.Thread(target=self._record_local_log, args=(end_filename,))
         t.start()
         return self.reactor.NEVER
-
     def local_log_save(self, end_filename):
         import threading
         t = threading.Thread(target=self._local_log_save, args=(end_filename,))
@@ -1389,11 +1263,7 @@ class VirtualSD:
         self._reset_file()
 
     def get_yaml_info(self, _config_file=None):
-        """
-        read yaml file info
-        """
         import yaml
-        # if not _config_file:
         if not os.path.exists(_config_file):
             return {}
         config_data = {}
@@ -1405,9 +1275,6 @@ class VirtualSD:
         return config_data
 
     def set_yaml_info(self, _config_file=None, data=None):
-        """
-        write yaml file info
-        """
         import yaml
         if not _config_file:
             return
@@ -1418,22 +1285,6 @@ class VirtualSD:
             os.system("sync")
         except Exception as e:
             pass
-
-    # def _detect_ai_foregin_matter(self):
-    #     url = "http://127.0.0.1:8000/control/command?method=ai_foreign_matter_detect"
-    #     logging.info(url)
-    #     from sys import version_info
-    #     if version_info.major == 2:
-    #         import urllib2
-    #         urllib2.urlopen(url)
-    #     else:
-    #         import urllib.request
-    #         urllib.request.urlopen(url)
-    #
-    # def detect_ai_foregin_matter(self):
-    #     t = threading.Thread(target=self._detect_ai_foregin_matter)
-    #     t.start()
-
     def _record_local_log(self, end_filename):
         self.local_log_save(end_filename)
         if self.printer.in_shutdown_state:
@@ -1451,18 +1302,7 @@ class VirtualSD:
             new_url = parse.quote(url, safe=string.printable)
             import urllib.request
             urllib.request.urlopen(new_url)
-
     def _record_local_log_start_print(self):
-        # if os.path.exists("/etc/init.d/klipper_service.2"):
-        #     # multiprinter.yaml
-        #     MULTI_PRINTER_PATH = "/mnt/UDISK/.crealityprint/multiprinter.yaml"
-        #     multi_printer_info = self.get_yaml_info(MULTI_PRINTER_PATH)
-        #     multi_printer_info_list = multi_printer_info.get("multi_printer_info")
-        #     for printer_info in multi_printer_info_list:
-        #         if str(printer_info.get("printer_id")) == self.index:
-        #             printer_info["status"] = 2
-        #             self.set_yaml_info(MULTI_PRINTER_PATH, multi_printer_info)
-        #             break
         with open("/mnt/UDISK/.crealityprint/printer%s_stat" % self.index, "w+") as f:
             f.write("2")
         url = "http://127.0.0.1:8000/settings/machine_info/?method=record_local_log&message=start_print&index=%s&filename=%s" % (
@@ -1476,7 +1316,6 @@ class VirtualSD:
             new_url = parse.quote(url, safe=string.printable)
             import urllib.request
             urllib.request.urlopen(new_url)
-
 
 def load_config(config):
     return VirtualSD(config)
