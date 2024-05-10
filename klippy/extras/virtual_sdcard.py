@@ -10,7 +10,6 @@ import json, time
 VALID_GCODE_EXTS = ['gcode', 'g', 'gco']
 LAYER_KEYS = [";LAYER:", "; layer:", "; LAYER:", ";AFTER_LAYER_CHANGE"]
 
-
 class VirtualSD:
     def __init__(self, config):
         self.printer = config.get_printer()
@@ -123,12 +122,9 @@ class VirtualSD:
                 logging.info("lida_config is %s" % lida_config)
                 if lida_config.get('is_error_pause'):
                     self.is_lida_error_paused = True
-                    # raise self.gcode.error("Printing quality issue detected, printing has been paused")
-                    # self.gcode.run_script("PAUSE")
                 else:
                     self.gcode.respond_info("Printing quality issue detected")
         except Exception as e:
-            # self.gcode.run_script(self.on_error_gcode.render())
             logging.exception(e)
         self.first_layer_complete_status2 = True
 
@@ -187,7 +183,6 @@ class VirtualSD:
         if self.current_file:
             return self.current_file.name
         return None
-
     def progress(self):
         if self.file_size:
             try:

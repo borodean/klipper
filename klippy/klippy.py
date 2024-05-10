@@ -23,26 +23,25 @@ Printer is halted
 """
 
 message_protocol_error1 = """
-This type of error is frequently caused by running an older
-version of the firmware on the micro-controller (fix by
-recompiling and flashing the firmware).
+This is frequently caused by running an older version of the
+firmware on the MCU(s). Fix by recompiling and flashing the
+firmware.
 """
 message_protocol_error2 = """
 Once the underlying issue is corrected, use the "RESTART"
 command to reload the config and restart the host software.
-Protocol error connecting to printer
 """
 
 message_mcu_connect_error = """
 Once the underlying issue is corrected, use the
-FIRMWARE_RESTART command to reset the firmware, reload the
+"FIRMWARE_RESTART" command to reset the firmware, reload the
 config, and restart the host software.
 Error configuring printer
 """
 
 message_shutdown = """
 Once the underlying issue is corrected, use the
-FIRMWARE_RESTART command to reset the firmware, reload the
+"FIRMWARE_RESTART" command to reset the firmware, reload the
 config, and restart the host software.
 Printer is shutdown
 """
@@ -167,8 +166,8 @@ class Printer:
                     return
                 cb()
         except (self.config_error, pins.error) as e:
-            self._set_state("%s\n%s" % (str(e), message_restart))
             logging.exception("Config error")
+            self._set_state("%s\n%s" % (str(e), message_restart))
             return
         except msgproto.error as e:
             logging.exception("Protocol error")

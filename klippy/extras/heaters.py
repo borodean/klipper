@@ -342,7 +342,7 @@ class PrinterHeaters:
         gcode = self.printer.lookup_object("gcode")
         reactor = self.printer.get_reactor()
         eventtime = reactor.monotonic()
-        while not self.printer.is_shutdown() and heater.check_busy(eventtime) :
+        while not self.printer.is_shutdown() and heater.check_busy(eventtime):
             if self.can_break:
                 self.can_break = False
                 break
