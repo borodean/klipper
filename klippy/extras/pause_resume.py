@@ -126,11 +126,7 @@ class PauseResume:
         import os, time
         reactor = self.printer.get_reactor()
         count = 0
-        # while True:
         while self.v_sd.toolhead_moved:
-            # count += 1
-            # if not self.v_sd.toolhead_moved or count > 500:
-            #     break
             time.sleep(0.001)
             reactor.pause(reactor.monotonic() + .01)
         if self.is_paused:

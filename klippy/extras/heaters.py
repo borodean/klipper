@@ -345,10 +345,6 @@ class PrinterHeaters:
         while not self.printer.is_shutdown() and heater.check_busy(eventtime) :
             if self.can_break:
                 self.can_break = False
-                # toolhead._handle_shutdown()
-                # toolhead.move_queue.reset()
-                # self.turn_off_all_heaters()
-                # gcode.run_script("G28")
                 break
             print_time = toolhead.get_last_move_time()
             gcode.respond_raw(self._get_temp(eventtime))

@@ -265,7 +265,6 @@ class GCodeMove:
             f.write(json.dumps(data))
             f.flush()
     cmd_CX_SAVE_GCODE_STATE_help = "CX Save G-Code coordinate state"
-    # def cmd_CX_SAVE_GCODE_STATE(self, file_position, path, file_name):
     def cmd_CX_SAVE_GCODE_STATE(self, file_position, path, line_pos):
         import json
         from subprocess import call
@@ -275,9 +274,6 @@ class GCodeMove:
         }
         cmd = "sed -i %sc'%s' %s" % (line_pos, json.dumps(data), path)
         call(cmd, shell=True)
-        # with open(path, "w") as f:
-        #     f.write(json.dumps(data))
-        #     f.flush()
     cmd_CX_RESTORE_GCODE_STATE_help = "Restore a previously saved G-Code state"
     def cmd_CX_RESTORE_GCODE_STATE(self, path, file_name_path, XYZE):
         try:
@@ -313,7 +309,6 @@ class GCodeMove:
                             if obj.get("file_position", 0) > info.get("file_position", 0):
                                 info = obj
                 ret = info
-                # ret = json.loads(f.read())
                 state["file_position"] = ret.get("file_position", 0)
                 state["base_position"] = [0.0, 0.0, 0.0, ret.get("base_position_e", -1)]
                 base_position_e = ret.get("base_position_e", -1)
@@ -332,23 +327,18 @@ class GCodeMove:
             logging.info("power_loss cmd_CX_RESTORE_GCODE_STATE self.last_position:%s" % str(self.last_position))
             # Restore state
             self.absolute_coord = state['absolute_coord']
-            # self.absolute_extrude = state['absolute_extrude']
             self.base_position = list(state['base_position'])
             logging.info("power_loss cmd_CX_RESTORE_GCODE_STATE base_position:%s" % str(self.base_position))
             self.homing_position_bak = self.homing_position
             self.homing_position = list(state['homing_position'])
             self.speed = state['speed']
             self.speed_factor = state['speed_factor']
-            # self.extrude_factor = state['extrude_factor']
             self.extrude_factor = 1.0
             # Restore the relative E position
             if self.is_delta:
-                # e_diff = self.last_position[3] - state['last_position'][3] + 1.0
                 e_diff = self.last_position[3] - state['last_position'][3] + 6.0
             else:
-                # e_diff = self.last_position[3] - state['last_position'][3] - 0.5
                 e_diff = self.last_position[3] - state['last_position'][3]- 0.2
-            # e_diff = self.last_position[3] - state['last_position'][3]
             self.base_position[3] += e_diff
             # Move the toolhead back if requested
             gcode = self.printer.lookup_object('gcode')
@@ -377,11 +367,9 @@ class GCodeMove:
             if self.is_delta:
                 cur_x, cur_y, cur_z, cur_e = toolhead.get_position()
                 logging.info("power_loss cmd_CX_RESTORE_GCODE_STATE get cur position x:%s y:%s z:%s" % (cur_x,cur_y,cur_z))
-                # toolhead.set_position([cur_x, cur_y, self.last_position[2], self.last_position[3]], homing_axes=(2,))
                 self.is_power_loss = True
             else:
                 toolhead.set_position([x, y, z, self.last_position[3]], homing_axes=(2,))
-            # toolhead.set_position([x, y, z, self.last_position[3]], homing_axes=(2,))
             speed = self.speed
             self.last_position[:3] = state['last_position'][:3]
             if self.is_delta:
@@ -389,16 +377,13 @@ class GCodeMove:
                 z_pos = self.last_position[2]
                 logging.info("power_loss cmd_CX_RESTORE_GCODE_STATE move_with_transform: xyz%s" % str(self.last_position))
                 self.move_with_transform(self.last_position, speed)
-                # self.move_with_transform([cur_x, cur_y, z, state['last_position'][3]], speed)
             else:
                 self.move_with_transform(self.last_position, speed)
-            # self.move_with_transform(self.last_position, speed)
             gcode.run_script("G0 X%s Y%s F3000" % (state['last_position'][0], state['last_position'][1]))
             gcode.run_script("M400")
             if self.is_delta:
                 cur_x2, cur_y2, cur_z2, cur_e2 = toolhead.get_position()
                 logging.info("power_loss  cur_x2:%s y:%s z:%s" % (cur_x2,cur_y2,cur_z2))
-                # down_step = abs(self.homing_position_bak[2]) - 0.5 if abs(self.homing_position_bak[2]) - 0.5 > 0 else 0
                 down_step = abs(self.homing_position_bak[2]) + 0.2
                 gcode.run_script("G91\nG0 Z-%s\nG90" % down_step)
                 cur_x3, cur_y3, cur_z3, cur_e3 = toolhead.get_position()

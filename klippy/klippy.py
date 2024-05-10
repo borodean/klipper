@@ -268,21 +268,6 @@ class Printer:
             pass
     def _record_local_log(self, msg):
         global api_server_index
-        # if os.path.exists("/etc/init.d/klipper_service.2"):
-        #     multi_printer_info = self.get_yaml_info(MULTI_PRINTER_PATH)
-        #     multi_printer_info_list = multi_printer_info.get("multi_printer_info")
-        #     for printer_info in multi_printer_info_list:
-        #         if str(printer_info.get("printer_id")) == api_server_index:
-        #             if msg == "invoke_shutdown":
-        #                 printer_info["status"] = 0
-        #             elif msg == "printer_ready":
-        #                 printer_info["status"] = 1
-        #             elif msg == "init_status":
-        #                 printer_info["status"] = 0
-        #                 self.set_yaml_info(MULTI_PRINTER_PATH, multi_printer_info)
-        #                 return
-        #             self.set_yaml_info(MULTI_PRINTER_PATH, multi_printer_info)
-        #             break
         if msg == "invoke_shutdown":
             with open("/mnt/UDISK/.crealityprint/printer%s_stat" % api_server_index, "w+") as f:
                 logging.info("/mnt/UDISK/.crealityprint/printer%s_stat set invoke_shutdown" % api_server_index)
@@ -364,13 +349,6 @@ def arg_dictionary(option, opt_str, value, parser):
     parser.values.dictionary[key] = fname
 
 def main():
-    # printer_cfg_obj = "/mnt/UDISK/printer_config/printer.cfg"
-    # if not os.path.exists(printer_cfg_obj) or os.path.getsize(printer_cfg_obj) == 0:
-    #     raise
-    #     os.system("/bin/cp /usr/share/klipper-brain/printer_config/printer.cfg %s && sync" % printer_cfg_obj)
-    # timelapse_cfg_obj = "/mnt/UDISK/printer_config/timelapse.cfg"
-    # if not os.path.exists(timelapse_cfg_obj):
-    #     os.system("/bin/cp /usr/share/klipper-brain/printer_config/timelapse.cfg %s && sync" % timelapse_cfg_obj)
     usage = "%prog [options] <config file>"
     opts = optparse.OptionParser(usage)
     opts.add_option("-i", "--debuginput", dest="debuginput",
@@ -428,15 +406,11 @@ def main():
         if index == "2" or index == "3" or index == "4":
             api_server_index = index
             timelapse_cfg_obj = "/mnt/UDISK/printer_config" + index + "/timelapse.cfg"
-            # creality_obj = "/mnt/UDISK/printer_config" + index + "/creality"
         else:
             api_server_index = "1"
             timelapse_cfg_obj = "/mnt/UDISK/printer_config/timelapse.cfg"
-            # creality_obj = "/mnt/UDISK/printer_config/creality"
         if not os.path.exists(timelapse_cfg_obj):
             os.system("/bin/cp /usr/share/klipper-brain/printer_config/timelapse.cfg %s && sync" % timelapse_cfg_obj)
-        # if not os.path.exists(creality_obj):
-        #     os.system("/bin/cp -r /usr/share/klipper-brain/printer_config/config/creality %s && sync" % creality_obj)
 
         with open("/mnt/UDISK/.crealityprint/printer%s_stat" % api_server_index, "w+") as f:
             logging.info("/mnt/UDISK/.crealityprint/printer%s_stat set init invoke_shutdown status" % api_server_index)
@@ -448,7 +422,6 @@ def main():
     start_args = {'config_file': args[0], 'apiserver': options.apiserver,
                   'start_reason': 'startup'}
 
-    # debuglevel = logging.INFO
     debuglevel = logging.ERROR
     if options.verbose:
         debuglevel = logging.DEBUG

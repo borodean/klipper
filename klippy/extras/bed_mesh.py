@@ -332,7 +332,6 @@ class BedMeshCalibrate:
                 self.bedmesh.z_mesh.isenable = False
         except:
             pass
-        # self.gcode.respond_info("BED_MESH_SET_DISABLE: set isenable=%s id=%s" % (self.bedmesh.z_mesh.isenable, id(self.bedmesh.z_mesh)))
     cmd_BED_MESH_SET_DISABLE_helper = " set MESH disable"
     def cmd_BED_MESH_SET_ENABLE(self, gcmd):
         try:
@@ -340,7 +339,6 @@ class BedMeshCalibrate:
                 self.bedmesh.z_mesh.isenable = True
         except:
             pass
-        # self.gcode.respond_info("BED_MESH_SET_ENABLE: set isenable=%s id=%s" % (self.bedmesh.z_mesh.isenable, id(self.bedmesh.z_mesh)))
     cmd_BED_MESH_SET_ENABLE_helper = "set MESH enable "
     def _generate_points(self, error):
         x_cnt = self.mesh_config['x_count']
@@ -887,14 +885,6 @@ class ZMesh:
         self.mesh_y_dist = (self.mesh_y_max - self.mesh_y_min) / \
                            (self.mesh_y_count - 1)
         self.gcode = self.printer.lookup_object('gcode')
-        # if "BED_MESH_SET_DISABLE" not in self.gcode.ready_gcode_handlers:
-        #     self.gcode.register_command(
-        #         'BED_MESH_SET_DISABLE', self.cmd_BED_MESH_SET_DISABLE,
-        #         desc=self.cmd_BED_MESH_SET_DISABLE_helper)
-        # if "BED_MESH_SET_ENABLE" not in self.gcode.ready_gcode_handlers:
-        #     self.gcode.register_command(
-        #         'BED_MESH_SET_ENABLE', self.cmd_BED_MESH_SET_ENABLE,
-        #         desc=self.cmd_BED_MESH_SET_ENABLE_helper)
     def get_mesh_matrix(self):
         if self.mesh_matrix is not None:
             return [[round(z, 6) for z in line]
@@ -956,12 +946,6 @@ class ZMesh:
         return self.mesh_x_min + self.mesh_x_dist * index
     def get_y_coordinate(self, index):
         return self.mesh_y_min + self.mesh_y_dist * index
-    # def cmd_BED_MESH_SET_DISABLE(self, gcmd):
-    #     self.isenable = False
-    # cmd_BED_MESH_SET_DISABLE_helper = " set  MESH disable"
-    # def cmd_BED_MESH_SET_ENABLE(self, gcmd):
-    #     self.isenable = True
-    # cmd_BED_MESH_SET_ENABLE_helper = "set  MESH enable "
     def calc_z(self, x, y):
         if self.isenable:
             if self.mesh_matrix is not None:

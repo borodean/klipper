@@ -382,10 +382,6 @@ class PrinterConfig:
         import configparser
         cp = configparser.ConfigParser()
         cp.read(cfg_path)
-        # try:
-        #     cp.read(cfg_path, encoding="utf8")
-        # except Exception as e:
-        #     cp.read(cfg_path, encoding="gbk")
         sections = cp.sections()
         rpi_enable = False
         adxl345_enable = False
@@ -439,12 +435,6 @@ class PrinterConfig:
         self.remove_section("resonance_tester")
         cfgname = self.printer.get_start_args()['config_file']
         self.disable_mcu_rpi(cfgname)
-        # config = ConfigParser.ConfigParser()
-        # config.read(cfgname)
-        # config.remove_section("mcu rpi")
-        # config.remove_section("adxl345")
-        # config.remove_section("resonance_tester")
-        # config.write(open(cfgname, 'w'))
 
     cmd_SET_GEAR_RATIO_help = "Overwrite config file cmd_SET_GEAR_RATIO"
 
@@ -520,7 +510,6 @@ class PrinterConfig:
     cmd_SAVE_CONFIG_help = "Overwrite config file and restart"
 
     def cmd_SAVE_CONFIG(self, gcmd):
-        # self.cmd_remove_mcu_rpi_CONFIG(gcmd)
         if not self.autosave.fileconfig.sections():
             return
         gcode = self.printer.lookup_object('gcode')
@@ -617,5 +606,3 @@ class PrinterConfig:
             msg = "Unable to write config file during SAVE_CONFIG"
             logging.exception(msg)
             raise gcode.error(msg)
-        # Request a restart
-        # gcode.request_restart('restart')
