@@ -788,7 +788,6 @@ class VirtualSD:
                     print_switch = ret.get("switch", False)
             except Exception as err:
                 pass
-
         state = {}
         if print_switch and os.path.exists(path) and os.path.exists(print_file_name_save_path) and not self.is_laser_print:
             try:
@@ -1242,7 +1241,6 @@ class VirtualSD:
                 urllib.request.urlopen(new_url)
         except Exception as e:
             logging.exception(e)
-
     def timelapse_move(self, print_file_name_save_path, z_upraise):
         try:
             result = {}
@@ -1254,14 +1252,12 @@ class VirtualSD:
                 f.flush()
         except Exception as err:
             logging.error(err)
-
     def _last_reset_file(self):
         logging.info("will use _last_rest_file after 5s...")
         import time
         time.sleep(5)
         logging.info("use _last_rest_file")
         self._reset_file()
-
     def get_yaml_info(self, _config_file=None):
         import yaml
         if not os.path.exists(_config_file):
@@ -1273,7 +1269,6 @@ class VirtualSD:
         except Exception as err:
             pass
         return config_data
-
     def set_yaml_info(self, _config_file=None, data=None):
         import yaml
         if not _config_file:
