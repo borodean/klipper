@@ -122,19 +122,27 @@ class PrinterProbe:
         curtime = self.printer.get_reactor().monotonic()
         if 'z' not in toolhead.get_status(curtime)['homed_axes']:
             raise self.printer.command_error("Must home before probe")
-        phoming = self.printer.lookup_object('homing')
         pos = toolhead.get_position()
         pos[2] = self.z_position
         try:
             if self.printer.objects.get('laser'):
                 epos = self.printer.lookup_object('laser').run_G29_Z()
             else:
-                epos = phoming.probing_move(self.mcu_probe, pos, speed)
+                epos = self.mcu_probe.probing_move(pos, speed)
         except self.printer.command_error as e:
             reason = str(e)
             if "Timeout during endstop homing" in reason:
                 reason += HINT_TIMEOUT
             raise self.printer.command_error(reason)
+        # get z compensation from axis_twist_compensation
+        axis_twist_compensation = self.printer.lookup_object(
+            'axis_twist_compensation', None)
+        z_compensation = 0
+        if axis_twist_compensation is not None:
+            z_compensation = (
+                axis_twist_compensation.get_z_compensation_value(pos))
+        # add z compensation to probe position
+        epos[2] += z_compensation
         if number:
             self.gcode.respond_info("auto_bed_level %d,%.3f,%.3f, %.3f"
                                     % (number, epos[0], epos[1], epos[2] - self.z_offset))
@@ -207,7 +215,8 @@ class PrinterProbe:
         self.last_state = res
         gcmd.respond_info("probe: %s" % (["open", "TRIGGERED"][not not res],))
     def get_status(self, eventtime):
-        return {'last_query': self.last_state,
+        return {'name': self.name,
+                'last_query': self.last_state,
                 'last_z_result': self.last_z_result}
     cmd_PROBE_ACCURACY_help = "Probe Z-height accuracy at current XY position"
     def cmd_PROBE_ACCURACY(self, gcmd):
@@ -329,20 +338,20 @@ class ProbeEndstopWrapper:
         for stepper in kin.get_steppers():
             if stepper.is_active_axis('z'):
                 self.add_stepper(stepper)
-    def raise_probe(self):
+    def _raise_probe(self):
         toolhead = self.printer.lookup_object('toolhead')
         start_pos = toolhead.get_position()
         self.deactivate_gcode.run_gcode_from_command()
         if toolhead.get_position()[:3] != start_pos[:3]:
             raise self.printer.command_error(
-                "Toolhead moved during probe activate_gcode script")
-    def lower_probe(self):
+                "Toolhead moved during probe deactivate_gcode script")
+    def _lower_probe(self):
         toolhead = self.printer.lookup_object('toolhead')
         start_pos = toolhead.get_position()
         self.activate_gcode.run_gcode_from_command()
         if toolhead.get_position()[:3] != start_pos[:3]:
             raise self.printer.command_error(
-                "Toolhead moved during probe deactivate_gcode script")
+                "Toolhead moved during probe activate_gcode script")
     def multi_probe_begin(self):
         if self.stow_on_each_sample:
             return
@@ -350,16 +359,19 @@ class ProbeEndstopWrapper:
     def multi_probe_end(self):
         if self.stow_on_each_sample:
             return
-        self.raise_probe()
+        self._raise_probe()
         self.multi = 'OFF'
+    def probing_move(self, pos, speed):
+        phoming = self.printer.lookup_object('homing')
+        return phoming.probing_move(self, pos, speed)
     def probe_prepare(self, hmove):
         if self.multi == 'OFF' or self.multi == 'FIRST':
-            self.lower_probe()
+            self._lower_probe()
             if self.multi == 'FIRST':
                 self.multi = 'ON'
     def probe_finish(self, hmove):
         if self.multi == 'OFF':
-            self.raise_probe()
+            self._raise_probe()
     def get_position_endstop(self):
         return self.position_endstop
 
@@ -376,7 +388,8 @@ class ProbePointsHelper:
         if default_points is None or config.get('points', None) is not None:
             self.probe_points = config.getlists('points', seps=(',', '\n'),
                                                 parser=float, count=2)
-        self.horizontal_move_z = config.getfloat('horizontal_move_z', 5.)
+        def_move_z = config.getfloat('horizontal_move_z', 5.)
+        self.default_horizontal_move_z = def_move_z
         self.speed = config.getfloat('speed', 50., above=0.)
         self.use_offsets = False
         # Internal probing state
@@ -422,6 +435,9 @@ class ProbePointsHelper:
         probe = self.printer.lookup_object('probe', None)
         method = gcmd.get('METHOD', 'automatic').lower()
         self.results = []
+        def_move_z = self.default_horizontal_move_z
+        self.horizontal_move_z = gcmd.get_float('HORIZONTAL_MOVE_Z',
+                                                def_move_z)
         if probe is None or method != 'automatic':
             # Manual probe
             self.lift_speed = self.speed

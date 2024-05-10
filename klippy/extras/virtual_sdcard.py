@@ -1,15 +1,21 @@
 # Virtual sdcard support (print files directly from a host g-code file)
 #
-# Copyright (C) 2018  Kevin O'Connor <kevin@koconnor.net>
+# Copyright (C) 2018-2024  Kevin O'Connor <kevin@koconnor.net>
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
-import os, logging, io
+import os, sys, logging, io
 from subprocess import check_output
 import threading
 import json, time
 
 VALID_GCODE_EXTS = ['gcode', 'g', 'gco']
 LAYER_KEYS = [";LAYER:", "; layer:", "; LAYER:", ";AFTER_LAYER_CHANGE"]
+
+DEFAULT_ERROR_GCODE = """
+{% if 'heaters' in printer %}
+   TURN_OFF_HEATERS
+{% endif %}
+"""
 
 class VirtualSD:
     def __init__(self, config):
@@ -31,7 +37,7 @@ class VirtualSD:
         # Error handling
         gcode_macro = self.printer.load_object(config, 'gcode_macro')
         self.on_error_gcode = gcode_macro.load_template(
-            config, 'on_error_gcode', '')
+            config, 'on_error_gcode', DEFAULT_ERROR_GCODE)
         if self.printer.start_args.get("apiserver")[-1] != "s":
             self.index = self.printer.start_args.get("apiserver")[-1]
             with open("/mnt/UDISK/printer_config%s/printer.cfg" % self.index) as f:
@@ -210,7 +216,7 @@ class VirtualSD:
             self.current_file.close()
             self.current_file = None
             self.print_stats.note_cancel()
-        self.file_position = self.file_size = 0.
+        self.file_position = self.file_size = 0
         if not self.is_laser_print:
             from subprocess import call
             mcu = self.printer.lookup_object('mcu', None)
@@ -242,7 +248,7 @@ class VirtualSD:
             self.do_pause()
             self.current_file.close()
             self.current_file = None
-        self.file_position = self.file_size = 0.
+        self.file_position = self.file_size = 0
         self.print_stats.reset()
         self.printer.send_event("virtual_sdcard:reset_file")
     cmd_SDCARD_RESET_FILE_help = "Clears a loaded SD File. Stops the print "\
@@ -927,7 +933,10 @@ class VirtualSD:
             # Dispatch command
             self.cmd_from_sd = True
             line = lines.pop()
-            next_file_position = self.file_position + len(line) + 1
+            if sys.version_info.major >= 3:
+                next_file_position = self.file_position + len(line.encode()) + 1
+            else:
+                next_file_position = self.file_position + len(line) + 1
             self.next_file_position = next_file_position
             if self.count_line % 4999 == 0:
                 self.update_print_history_info()
