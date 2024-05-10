@@ -27,6 +27,7 @@ This is frequently caused by running an older version of the
 firmware on the MCU(s). Fix by recompiling and flashing the
 firmware.
 """
+
 message_protocol_error2 = """
 Once the underlying issue is corrected, use the "RESTART"
 command to reload the config and restart the host software.
