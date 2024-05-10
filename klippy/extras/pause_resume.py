@@ -107,7 +107,6 @@ class PauseResume:
         }
     def is_sd_active(self):
         return self.v_sd is not None and self.v_sd.is_active()
-
     def send_pause_command(self):
         # This sends the appropriate pause command from an event.  Note
         # the difference between pause_command_sent and is_paused, the
