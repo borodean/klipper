@@ -242,7 +242,6 @@ class Printer:
         read yaml file info
         """
         import yaml
-        # if not _config_file:
         if not os.path.exists(_config_file):
             return {}
         config_data = {}

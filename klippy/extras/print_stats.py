@@ -129,7 +129,6 @@ class PrintStats:
         if self.new_total_print_time > self.last_new_total_print_time:
             self.set_total_print_time(self.new_total_print_time)
             self.last_new_total_print_time = self.new_total_print_time
-            # self.last_total_print_time = self.new_total_print_time
         return {
             'filename': self.filename,
             'total_duration': self.total_duration,

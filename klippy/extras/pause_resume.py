@@ -42,7 +42,6 @@ class PauseResume:
         webhooks.register_endpoint("set_extruder_gear_ratio",
                                    self._set_extruder_gear_ratio_request)
     def _handle_extruder_rotation_distance_request(self, web_request):
-        # self.autosave.fileconfig.set(section, option, svalue)
         rotation_dist = 32.473
         if self.config.has_section("extruder"):
             rotation_dist = self.config.getsection("extruder").getfloat('rotation_distance', above=0., note_valid=False)
