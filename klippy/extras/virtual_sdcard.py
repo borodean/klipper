@@ -345,43 +345,6 @@ class VirtualSD:
         except Exception as err:
             logging.exception(err)
         return result
-    def get_print_temperature(self, file_path):
-        import re
-        bed = 0
-        nozzle = 0
-        try:
-            with open(file_path, "r") as f:
-                count = 50000
-                while count > 0:
-                    count -= 1
-                    line = f.readline()
-                    M109_state = re.findall(r"M109 S(\d+)", line)
-                    if M109_state:
-                        nozzle = int(M109_state[0])
-                        if nozzle < 180:
-                            nozzle = 0
-                        continue
-                    M190_state = re.findall(r"M190 S(\d+)", line)
-                    if M190_state:
-                        bed = int(M190_state[0])
-                        continue
-                    M104_state = re.findall(r"M104 S(\d+)", line)
-                    if M104_state:
-                        nozzle = int(M104_state[0])
-                        if nozzle < 180:
-                            nozzle = 0
-                        continue
-                    M140_state = re.findall(r"M140 S(\d+)", line)
-                    if M140_state:
-                        bed = int(M140_state[0])
-                        continue
-                    if bed and nozzle:
-                        break
-        except Exception as err:
-            bed = 60
-            nozzle = 200
-            logging.error(err)
-        return bed, nozzle
     # Background work timer
     def work_handler(self, eventtime):
         self.count_line = 0
