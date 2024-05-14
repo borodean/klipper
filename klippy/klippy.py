@@ -157,9 +157,6 @@ class Printer:
             return ""
     def _connect(self, eventtime):
         try:
-            import threading
-            t = threading.Thread(target=self._record_local_log, args=("reconnect",))
-            t.start()
             self._read_config()
             self.send_event("klippy:mcu_identify")
             for cb in self.event_handlers.get("klippy:connect", []):
@@ -190,11 +187,6 @@ class Printer:
             return
         try:
             self._set_state(message_ready)
-            logging.info("+++++++++++++++printer_ready")
-
-            import threading
-            t = threading.Thread(target=self._record_local_log, args=("printer_ready",))
-            t.start()
             for cb in self.event_handlers.get("klippy:ready", []):
                 if self.state_message is not message_ready:
                     return
@@ -237,37 +229,9 @@ class Printer:
             logging.info(info)
         if self.bglogger is not None:
             self.bglogger.set_rollover_info(name, info)
-    def _record_local_log(self, msg):
-        global api_server_index
-        if msg == "invoke_shutdown":
-            with open("/mnt/UDISK/.crealityprint/printer%s_stat" % api_server_index, "w+") as f:
-                logging.info("/mnt/UDISK/.crealityprint/printer%s_stat set invoke_shutdown" % api_server_index)
-                f.write("0")
-        elif msg == "printer_ready":
-            logging.info("/mnt/UDISK/.crealityprint/printer%s_stat set printer_ready" % api_server_index)
-            with open("/mnt/UDISK/.crealityprint/printer%s_stat" % api_server_index, "w+") as f:
-                f.write("1")
-        elif msg == "reconnect":
-            logging.info("/mnt/UDISK/.crealityprint/printer%s_stat set reconnect" % api_server_index)
-            with open("/mnt/UDISK/.crealityprint/printer%s_stat" % api_server_index, "w+") as f:
-                f.write("0")
-        url = "http://127.0.0.1:8000/settings/machine_info/?method=record_log_to_remote_sererver&message=%s&index=%s" % (
-                msg, api_server_index)
-        logging.info(url)
-        from sys import version_info
-        if version_info.major == 2:
-            import urllib2
-            urllib2.urlopen(url)
-        else:
-            import urllib.request
-            urllib.request.urlopen(url)
     def invoke_shutdown(self, msg):
         if self.in_shutdown_state:
             return
-        logging.info("+++++++++++++++invoke_shutdown")
-        import threading
-        t = threading.Thread(target=self._record_local_log, args=("invoke_shutdown",))
-        t.start()
         logging.error("Transition to shutdown state: %s", msg)
         self.in_shutdown_state = True
         self._set_state("%s%s" % (msg, message_shutdown))

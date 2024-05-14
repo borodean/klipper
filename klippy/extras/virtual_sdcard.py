@@ -353,12 +353,6 @@ class VirtualSD:
         path = "/mnt/UDISK/%s_gcode_coordinate.save" % pre_serial
         calc_layer_count = 0
         logging.info("Starting SD card print (position %d)", self.file_position)
-        import threading
-        t = threading.Thread(target=self._record_local_log_start_print)
-        t.start()
-        print_file_name_save_path = "/mnt/UDISK/%s_print_file_name.save" % pre_serial
-        state = {}
-        self.print_stats.note_start()
         self.reactor.unregister_timer(self.work_timer)
         try:
             self.current_file.seek(self.file_position)
@@ -478,13 +472,6 @@ class VirtualSD:
             self.print_stats.note_pause()
         else:
             self.print_stats.note_complete()
-            import threading
-            t = threading.Thread(target=self._last_reset_file)
-            t.start()
-        logging.error("filename:%s end print", end_filename)
-        import threading
-        t = threading.Thread(target=self._record_local_log, args=(end_filename,))
-        t.start()
         return self.reactor.NEVER
     def local_log_save(self, end_filename):
         import threading
@@ -513,37 +500,6 @@ class VirtualSD:
         time.sleep(5)
         logging.info("use _last_rest_file")
         self._reset_file()
-    def _record_local_log(self, end_filename):
-        self.local_log_save(end_filename)
-        if self.printer.in_shutdown_state:
-            return
-        with open("/mnt/UDISK/.crealityprint/printer%s_stat" % self.index, "w+") as f:
-            f.write("1")
-        url = "http://127.0.0.1:8000/settings/machine_info/?method=record_local_log&message=print_exit_upload_log&index=%s&filename=%s" % (
-                self.index, end_filename)
-        from sys import version_info
-        if version_info.major == 2:
-            import urllib2
-            urllib2.urlopen(url)
-        else:
-            from urllib import parse
-            new_url = parse.quote(url, safe=string.printable)
-            import urllib.request
-            urllib.request.urlopen(new_url)
-    def _record_local_log_start_print(self):
-        with open("/mnt/UDISK/.crealityprint/printer%s_stat" % self.index, "w+") as f:
-            f.write("2")
-        url = "http://127.0.0.1:8000/settings/machine_info/?method=record_local_log&message=start_print&index=%s&filename=%s" % (
-            self.index, self.current_file.name)
-        from sys import version_info
-        if version_info.major == 2:
-            import urllib2
-            urllib2.urlopen(url)
-        else:
-            from urllib import parse
-            new_url = parse.quote(url, safe=string.printable)
-            import urllib.request
-            urllib.request.urlopen(new_url)
 
 def load_config(config):
     return VirtualSD(config)
