@@ -893,7 +893,7 @@ class BedMeshCalibrate:
                         "Probed table length: %d Probed Table:\n%s") %
                     (len(probed_matrix), str(probed_matrix)))
 
-        z_mesh = ZMesh(params, self._profile_name, self.printer)
+        z_mesh = ZMesh(params, self._profile_name)
         try:
             z_mesh.build_mesh(probed_matrix)
         except BedMeshError as e:
@@ -992,9 +992,8 @@ class MoveSplitter:
 
 
 class ZMesh:
-    def __init__(self, params, name, printer):
+    def __init__(self, params, name):
         self.profile_name = name or "adaptive-%X" % (id(self),)
-        self.printer = printer
         self.isenable = True
         self.probed_matrix = self.mesh_matrix = None
         self.mesh_params = params
@@ -1032,7 +1031,6 @@ class ZMesh:
                            (self.mesh_x_count - 1)
         self.mesh_y_dist = (self.mesh_y_max - self.mesh_y_min) / \
                            (self.mesh_y_count - 1)
-        self.gcode = self.printer.lookup_object('gcode')
     def get_mesh_matrix(self):
         if self.mesh_matrix is not None:
             return [[round(z, 6) for z in line]
@@ -1397,7 +1395,7 @@ class ProfileManager:
                 "bed_mesh: Unknown profile [%s]" % prof_name)
         probed_matrix = profile['points']
         mesh_params = profile['mesh_params']
-        z_mesh = ZMesh(mesh_params, prof_name, self.printer)
+        z_mesh = ZMesh(mesh_params, prof_name)
         try:
             z_mesh.build_mesh(probed_matrix)
         except BedMeshError as e:
