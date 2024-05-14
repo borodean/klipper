@@ -4,8 +4,6 @@
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
 import os, sys, logging, io
-from subprocess import check_output
-import threading
 import json, time
 
 VALID_GCODE_EXTS = ['gcode', 'g', 'gco']
@@ -63,7 +61,6 @@ class VirtualSD:
         self.count_line = 0
         self.do_resume_status = False
         self.do_cancel_status = False
-        self.create_video_params = {}
         self.cancel_print_state = False
         self.power_loss_pause_flag = False
         self.pause_flag = 1  # 1 Pause during printing, 2 Suspension of preheating process after power failure
@@ -151,8 +148,6 @@ class VirtualSD:
         self.work_timer = self.reactor.register_timer(
             self.work_handler, self.reactor.NOW)
     def do_cancel(self):
-        if self.must_pause_work:
-            self.create_video()
         self.do_cancel_status = True
         if self.current_file is not None:
             self.do_pause()
@@ -172,7 +167,6 @@ class VirtualSD:
                 os.remove(print_file_name_save_path)
             call("sync", shell=True)
             gcode_move = self.printer.lookup_object('gcode_move')
-            gcode = self.printer.lookup_object('gcode')
             toolhead = self.printer.lookup_object('toolhead')
             if toolhead and gcode_move and gcode_move.is_delta and gcode_move.is_power_loss:
                 gcode_move.is_power_loss = False
@@ -330,40 +324,6 @@ class VirtualSD:
     def record_status(self, path, line_pos):
         gcode_move = self.printer.lookup_object('gcode_move')
         gcode_move.cmd_CX_SAVE_GCODE_STATE(self.file_position, path, line_pos)
-    def create_video(self):
-        try:
-            if not self.create_video_params.get("enable_delay_photography", True):
-                return
-            if not self.create_video_params.get("isCurUSB", True):
-                return
-            timelapse_postion = self.create_video_params.get("timelapse_postion")
-            layer_count = self.create_video_params.get("layer_count")
-            output_framerate = self.create_video_params.get("output_framerate")
-            frequency = self.create_video_params.get("frequency")
-            base_shoot_path = self.create_video_params.get("base_shoot_path")
-            output_pre_video_path = self.create_video_params.get("output_pre_video_path")
-            filename = self.create_video_params.get("filename")
-            test_jpg_path = self.create_video_params.get("test_jpg_path")
-            from datetime import datetime
-            now = datetime.now()
-            date_time = now.strftime("%Y%m%d_%H%M")
-            camera_site = True if timelapse_postion == 1 else False
-            play_times = int(layer_count / int(frequency) / output_framerate)
-            filename_extend = "@%s@%s@%s@%s@" % (camera_site, frequency, output_framerate, play_times)
-            outfile = "timelapse_%s_%s%s" % (filename, date_time, filename_extend)
-            rendering_video_cmd = """ffmpeg -framerate {0} -i  {1} -vcodec copy -y -f mp4 '{2}.mp4'""".format(
-                output_framerate, base_shoot_path, output_pre_video_path + "/" + outfile)
-            preview_jpg_path = test_jpg_path.replace("test.jpg", outfile + ".jpg")
-            snapshot_cmd = "wget http://localhost:8080/?action=snapshot -O '%s'" % preview_jpg_path
-            base_shoot_path_cmd = "rm -f /mnt/UDISK/delayed_imaging/test.264"
-            logging.info(snapshot_cmd)
-            os.system(snapshot_cmd)
-            logging.info(rendering_video_cmd)
-            os.system(rendering_video_cmd)
-            os.system("sync")
-            os.system(base_shoot_path_cmd)
-        except Exception as e:
-            logging.exception(e)
     def tail_read(self, f):
         cur_pos = f.tell()
         buf = ''
@@ -460,176 +420,16 @@ class VirtualSD:
             nozzle = 200
             logging.error(err)
         return bed, nozzle
-    def check_slr_camera(self):
-        slr_camera = "/mnt/UDISK/.crealityprint/slr_camera.yaml"
-        is_gphoto2 = False
-        slr_position = 0
-        slr_frequency = 1
-        slr_z_upraise = 1
-        slr_extruder = -3
-        slr_extruder_speed = 40 * 60
-        is_slr_flsun_type = False
-        try:
-            import yaml
-            with open(slr_camera) as f:
-                slr_config = yaml.load(f.read(), Loader=yaml.Loader)
-                logging.info(slr_config)
-                slr_enable = int(slr_config.get('1').get("enable", False))
-                mcu = self.printer.lookup_object('mcu', None)
-                pre_serial = mcu._serial.serial_dev.port.split("/")[-1]
-                usb_serial = "usb_serial_%s" % slr_config.get("1").get("usb", "1")
-                logging.info("slr_enable=%s, pre_serial[%s] == usb_serial[%s]" % (
-                    slr_enable, pre_serial, usb_serial))
-                if slr_enable and pre_serial == usb_serial:
-                    slr_position = int(slr_config.get('1').get("position", 0))
-                    slr_frequency = int(slr_config.get("1").get("frequency", 1))
-                    slr_z_upraise = int(slr_config.get("1").get("z_upraise", 1))
-                    slr_extruder = 0 - float(slr_config.get('1').get("extruder", 3))
-                    slr_extruder_speed = int(slr_config.get('1').get("extruder_speed", 40)) * 60
-                    if slr_config.get("1").get("usb", "1") != "1":
-                        slr_printer_cfg_path = "/mnt/UDISK/printer_config%s/printer.cfg"\
-                                               % slr_config.get("1").get("usb", "1")
-                    else:
-                        slr_printer_cfg_path = "/mnt/UDISK/printer_config/printer.cfg"
-                    with open(slr_printer_cfg_path) as f:
-                        printer_config_text = f.read()
-                        if printer_config_text.startswith("# !Flsun"):
-                            is_slr_flsun_type = True
-                    try:
-                        gphoto2_detect = "gphoto2 --auto-detect"
-                        logging.info(gphoto2_detect)
-                        gphoto2_detect_result = check_output(gphoto2_detect, shell=True).decode()
-                        logging.info(gphoto2_detect_result)
-                        gphoto2_detect_lines = gphoto2_detect_result.splitlines()
-                        logging.info(gphoto2_detect_lines)
-                        if len(gphoto2_detect_lines) >= 3:
-                            is_gphoto2 = True
-                            logging.info("is_gphoto2 = True")
-                            gphoto2_set_config = "gphoto2 --set-config capturetarget=1"
-                            logging.info(gphoto2_set_config)
-                            os.system(gphoto2_set_config)
-                        else:
-                            self.gcode.respond_info("gphoto2 --auto-detect error:%s" % gphoto2_detect_lines)
-                            logging.error("gphoto2 --auto-detect error:%s" % gphoto2_detect_lines)
-                    except Exception as e:
-                        self.gcode.respond_info("gphoto2 --auto-detect error:%s" % e)
-                        logging.exception(e)
-                        is_gphoto2 = False
-        except Exception as e:
-            logging.info("check_slr_camera:%s" % e.__str__())
-            is_gphoto2 = False
-            slr_position = 0
-            slr_frequency = 1
-            slr_z_upraise = 1
-            slr_extruder = -3
-            slr_extruder_speed = 40 * 60
-        return is_gphoto2, slr_position, slr_frequency, is_slr_flsun_type, slr_z_upraise, slr_extruder, slr_extruder_speed
-    def _capture_slr_gphoto_set_config(self):
-        gphoto2_set_config = "gphoto2 --set-config capturetarget=1"
-        logging.info(gphoto2_set_config)
-        os.system(gphoto2_set_config)
-    def capture_slr_gphoto_set_config(self):
-        t = threading.Thread(target=self._capture_slr_gphoto_set_config)
-        t.start()
-    def _capture_slr_gphoto(self):
-        try:
-            gphoto2_capture_image = "gphoto2 --capture-image"
-            logging.info(gphoto2_capture_image)
-            gphoto2_capture_image_value = check_output(gphoto2_capture_image, shell=True).decode("utf8")
-            if "Error" in gphoto2_capture_image_value:
-                self.gcode.respond_info("gphoto2 --capture-image error: %s" % gphoto2_capture_image_value)
-            else:
-                logging.info("gphoto2 --capture-image info: %s" % gphoto2_capture_image_value)
-        except Exception as e:
-            self.gcode.respond_info("gphoto2 --capture-image error: %s" % e)
-            logging.exception(e)
-    def capture_slr_gphoto(self):
-        t = threading.Thread(target=self._capture_slr_gphoto)
-        t.start()
     # Background work timer
     def work_handler(self, eventtime):
         self.count_line = 0
-        filename = os.path.basename(self.current_file.name) if self.current_file else ""
         import time
-        # read slr camera config
-        (is_gphoto2,
-         slr_position,
-         slr_frequency,
-         is_slr_flsun_type,
-         slr_z_upraise,
-         slr_extruder,
-         slr_extruder_speed) = self.check_slr_camera()
-        logging.info("check_slr_camera: is_gphoto2=%s, slr_position=%s, slr_frequency=%s, is_slr_flsun_type=%s, slr_z_upraise=%s, slr_extruder=%s, slr_extruder_speed=%s" % (
-            is_gphoto2,
-            slr_position,
-            slr_frequency,
-            is_slr_flsun_type,
-            slr_z_upraise,
-            slr_extruder,
-            slr_extruder_speed
-        ))
         # When the nozzle is moved
-        output_pre_video_path = "/mnt/UDISK/.crealityprint/video"
-        is_flsun_type = False
         logging.info("********************%s*************" % self.is_laser_print)
-        try:
-            import yaml
-            with open("/mnt/UDISK/.crealityprint/time_lapse.yaml") as f:
-                config_data = yaml.load(f.read(), Loader=yaml.Loader)
-            timelapse_postion = int(config_data.get('1').get("position", 0))
-            enable_delay_photography = config_data.get('1').get("enable_delay_photography", False)
-            frequency = int(config_data.get("1").get("frequency", 1))
-            z_upraise = int(config_data.get('1').get("z_upraise", 1))
-            brain_fps = config_data.get("1").get("fps", "MP4-15")
-            usb_serial = "usb_serial_%s" % config_data.get("1").get("usb", "1")
-            if brain_fps == "MP4-15":
-                output_framerate = 15
-            else:
-                output_framerate = 25
-            filename = os.path.basename(self.file_path())
-            extruder = 0 - float(config_data.get('1').get("extruder", 3))
-            extruder_speed = int(config_data.get('1').get("extruder_speed", 40)) * 60
-            if config_data.get("1").get("usb", "1") != "1":
-                printer_cfg_path = "/mnt/UDISK/printer_config%s/printer.cfg" % config_data.get("1").get("usb", "1")
-            else:
-                printer_cfg_path = "/mnt/UDISK/printer_config/printer.cfg"
-            with open(printer_cfg_path) as f:
-                printer_config_text = f.read()
-                if printer_config_text.startswith("# !Flsun"):
-                    is_flsun_type = True
-                elif printer_config_text.startswith("# !Ender-3 Laser"):
-                    enable_delay_photography = False
-                    is_gphoto2 = False
-        except Exception as e:
-            logging.info(e)
-            filename = os.path.basename(self.file_path())
-            timelapse_postion = 0
-            frequency = 1
-            enable_delay_photography = False
-            usb_serial = "usb_serial_1"
-            z_upraise = 1
-            extruder = -3
-            extruder_speed = 40 * 60
-            output_framerate = 15
         mcu = self.printer.lookup_object('mcu', None)
         pre_serial = mcu._serial.serial_dev.port.split("/")[-1]
-        base_shoot_path = "/mnt/UDISK/delayed_imaging/test.264"
-        test_jpg_path = output_pre_video_path + "/test.jpg"
         path = "/mnt/UDISK/%s_gcode_coordinate.save" % pre_serial
-        try:
-            if not self.do_resume_status and not os.path.exists(
-                    path) and enable_delay_photography and pre_serial == usb_serial:
-                rm_video = "rm -f " + base_shoot_path
-                logging.info(rm_video)
-                os.system(rm_video)
-        except:
-            pass
         calc_layer_count = 0
-        layer_count = 0
-        slr_layer_count = 0
-        video0_status = True
-        logging.info(
-            "get enable_delay_photography:%s timelapse position is %s" % (enable_delay_photography, timelapse_postion))
         logging.info("Starting SD card print (position %d)", self.file_position)
         import threading
         t = threading.Thread(target=self._record_local_log_start_print)
@@ -692,29 +492,6 @@ class VirtualSD:
         if print_switch and not self.is_laser_print:
             gcode_move = self.printer.lookup_object('gcode_move')
             gcode_move.recordPrintFileName(print_file_name_save_path, self.current_file.name)
-        def create_video(timelapse_postion, layer_count, output_framerate, frequency, base_shoot_path,
-                         output_pre_video_path):
-            try:
-                from datetime import datetime
-                now = datetime.now()
-                date_time = now.strftime("%Y%m%d_%H%M")
-                camera_site = True if timelapse_postion == 1 else False
-                play_times = int(layer_count / int(frequency) / output_framerate)
-                filename_extend = "@%s@%s@%s@%s@" % (camera_site, frequency, output_framerate, play_times)
-                outfile = "timelapse_%s_%s%s" % (filename, date_time, filename_extend)
-                rendering_video_cmd = """ffmpeg -framerate {0} -i  {1} -vcodec copy -y -f mp4 '{2}.mp4'""".format(
-                    output_framerate, base_shoot_path, output_pre_video_path + "/" + outfile)
-                preview_jpg_path = test_jpg_path.replace("test.jpg", outfile + ".jpg")
-                snapshot_cmd = "wget http://localhost:8080/?action=snapshot -O '%s'" % preview_jpg_path
-                base_shoot_path_cmd = "rm -f /mnt/UDISK/delayed_imaging/test.264"
-                logging.info(snapshot_cmd)
-                os.system(snapshot_cmd)
-                logging.info(rendering_video_cmd)
-                os.system(rendering_video_cmd)
-                os.system("sync")
-                os.system(base_shoot_path_cmd)
-            except Exception as e:
-                logging.exception(e)
         self.reactor.unregister_timer(self.work_timer)
         try:
             self.current_file.seek(self.file_position)
@@ -731,11 +508,6 @@ class VirtualSD:
         lastE = 0
         line_pos = 1
         isCurUSB = True if pre_serial == usb_serial else False
-        self.create_video_params = {"timelapse_postion": timelapse_postion, "layer_count": layer_count,
-                                    "output_framerate": output_framerate, "frequency": frequency,
-                                    "base_shoot_path": base_shoot_path, "output_pre_video_path": output_pre_video_path,
-                                    "filename": filename, "test_jpg_path": test_jpg_path,
-                                    "isCurUSB": isCurUSB, "enable_delay_photography": enable_delay_photography}
         end_filename = self.file_path()
         while not self.must_pause_work:
             if not lines:
@@ -757,9 +529,6 @@ class VirtualSD:
                         os.remove(print_file_name_save_path)
                     if os.path.exists(self.gcode.exclude_object_info):
                         os.remove(self.gcode.exclude_object_info)
-                    if not self.do_resume_status and enable_delay_photography and pre_serial == usb_serial:
-                        create_video(timelapse_postion, layer_count, output_framerate, frequency, base_shoot_path,
-                                     output_pre_video_path)
                     toolhead = self.printer.lookup_object('toolhead')
                     gcode = self.printer.lookup_object('gcode')
                     if gcode and toolhead and gcode_move and gcode_move.is_delta and gcode_move.is_power_loss:
@@ -822,9 +591,6 @@ class VirtualSD:
                         self.cmd_fan = ""
                         if print_switch:
                             gcode_move.recordPrintFileName(print_file_name_save_path, self.current_file.name, fan_state=self.fan_state)
-                slr_capture_flag = False
-                if (video0_status == False and os.path.exists("/dev/video0")):
-                    video0_status = True
                 if calc_layer_count < 5:
                     for layer_key in LAYER_KEYS:
                         if ";LAYER_COUNT:" in layer_key:
@@ -834,146 +600,6 @@ class VirtualSD:
                             break
                     if calc_layer_count == 5:
                         os.system("touch /tmp/layer_count_%s.temp" % self.index)
-                if enable_delay_photography == True and video0_status == True and pre_serial == usb_serial:
-                    for layer_key in LAYER_KEYS:
-                        if ";LAYER_COUNT:" in layer_key:
-                            break
-                        if line.startswith(layer_key):
-                            if layer_count % int(frequency) == 0:
-                                if not os.path.exists("/dev/video0"):
-                                    video0_status = False
-                                    continue
-                                logging.info("timelapse_postion: %d" % timelapse_postion)
-                                if timelapse_postion and not is_flsun_type:
-                                    if is_gphoto2 and slr_position and frequency == slr_frequency and not is_slr_flsun_type:
-                                        self.capture_slr_gphoto_set_config()
-                                    from subprocess import call
-                                    cmd_wait_for_stepper = "M400"
-                                    toolhead = self.printer.lookup_object('toolhead')
-                                    X, Y, Z, E = toolhead.get_position()
-                                    if self.count_G1 >= 20:
-                                        self.toolhead_moved = True
-                                        # 1. Pull back and lift first
-                                        logging.info("G1 F%s E%s" % (extruder_speed, lastE + extruder))
-                                        logging.info(cmd_wait_for_stepper)
-                                        self.gcode.run_script_from_command("G1 F%s E%s" % (extruder_speed, lastE + extruder))
-                                        self.gcode.run_script_from_command(cmd_wait_for_stepper)
-                                        time.sleep(0.1)
-                                        logging.info("G1 F3000 Z%s" % (Z + z_upraise))
-                                        logging.info(cmd_wait_for_stepper)
-                                        self.gcode.run_script_from_command("G1 F3000 Z%s" % (Z + z_upraise))
-                                        self.gcode.run_script_from_command(cmd_wait_for_stepper)
-                                        if print_switch:
-                                            self.timelapse_move(print_file_name_save_path, z_upraise)
-                                        time.sleep(0.1)
-                                        # 2. move to the specified position
-                                        if is_flsun_type:
-                                            cmd = "G0 X0.5 Y98 F15000"
-                                        else:
-                                            cmd = "G0 X5 Y150 F15000"
-                                        logging.info(cmd)
-                                        self.gcode.run_script_from_command(cmd)
-                                        logging.info(cmd_wait_for_stepper)
-                                        self.gcode.run_script_from_command(cmd_wait_for_stepper)
-                                        try:
-                                            if is_gphoto2 and slr_position and frequency == slr_frequency and not is_slr_flsun_type:
-                                                self.capture_slr_gphoto()
-                                                slr_capture_flag = True
-                                            elif is_gphoto2 and slr_position and (
-                                                    layer_count % int(slr_frequency) == 0
-                                            ) and not is_slr_flsun_type:
-                                                self.capture_slr_gphoto()
-                                                slr_capture_flag = True
-                                            time.sleep(0.5)
-                                            capture_shell = "capture"
-                                            logging.info(capture_shell)
-                                            os.system(capture_shell)
-                                        except:
-                                            pass
-                                        time.sleep(0.1)
-                                        # 3. move back
-                                        move_back_cmd = "G0 X%s Y%s F15000" % (X, Y)
-                                        logging.info(move_back_cmd)
-                                        logging.info(cmd_wait_for_stepper)
-                                        self.gcode.run_script_from_command(move_back_cmd)
-                                        self.gcode.run_script_from_command(cmd_wait_for_stepper)
-                                        time.sleep(0.2)
-                                        logging.info("G1 F3000 Z%s" % Z)
-                                        logging.info(cmd_wait_for_stepper)
-                                        self.gcode.run_script_from_command("G1 F3000 Z%s" % Z)
-                                        self.gcode.run_script_from_command(cmd_wait_for_stepper)
-                                        time.sleep(0.1)
-                                        logging.info("G1 F%s E%s" % (extruder_speed, lastE))
-                                        self.gcode.run_script_from_command("G1 F%s E%s" % (extruder_speed, lastE))
-                                        self.gcode.run_script_from_command(cmd_wait_for_stepper)
-                                        time.sleep(0.2)
-                                        if print_switch:
-                                            gcode_move.recordPrintFileName(print_file_name_save_path, self.current_file.name, fan_state=self.fan_state)
-                                else:
-                                    try:
-                                        capture_shell = "capture &"
-                                        logging.info(capture_shell)
-                                        os.system(capture_shell)
-                                    except:
-                                        pass
-                            layer_count += 1
-                            break
-                if is_gphoto2 and not slr_capture_flag:
-                    for layer_key in LAYER_KEYS:
-                        if line.startswith(layer_key):
-                            if slr_layer_count % int(slr_frequency) == 0:
-                                if slr_position and not is_slr_flsun_type:
-                                    cmd_wait_for_stepper = "M400"
-                                    toolhead = self.printer.lookup_object('toolhead')
-                                    X, Y, Z, E = toolhead.get_position()
-                                    if self.count_G1 >= 20:
-                                        self.capture_slr_gphoto_set_config()
-                                        self.toolhead_moved = True
-                                        # 1. Pull back and lift first
-                                        logging.info("G1 F%s E%s" % (slr_extruder_speed, lastE + slr_extruder))
-                                        logging.info(cmd_wait_for_stepper)
-                                        self.gcode.run_script_from_command("G1 F%s E%s" % (slr_extruder_speed, lastE + slr_extruder))
-                                        self.gcode.run_script_from_command(cmd_wait_for_stepper)
-                                        time.sleep(0.1)
-                                        logging.info("G1 F3000 Z%s" % (Z + slr_z_upraise))
-                                        self.gcode.run_script_from_command("G1 F3000 Z%s" % (Z + slr_z_upraise))
-                                        logging.info(cmd_wait_for_stepper)
-                                        self.gcode.run_script_from_command(cmd_wait_for_stepper)
-                                        if print_switch:
-                                            self.timelapse_move(print_file_name_save_path, z_upraise)
-                                        time.sleep(0.1)
-                                        # 2. move to the specified position
-                                        if is_slr_flsun_type:
-                                            cmd = "G0 X0.5 Y98 F15000"
-                                        else:
-                                            cmd = "G0 X5 Y150 F15000"
-                                        logging.info(cmd)
-                                        self.gcode.run_script_from_command(cmd)
-                                        logging.info(cmd_wait_for_stepper)
-                                        self.gcode.run_script_from_command(cmd_wait_for_stepper)
-                                        self.capture_slr_gphoto()
-                                        time.sleep(0.5)
-                                        # 3. move back
-                                        move_back_cmd = "G0 X%s Y%s F15000" % (X, Y)
-                                        logging.info(move_back_cmd)
-                                        logging.info(cmd_wait_for_stepper)
-                                        self.gcode.run_script_from_command(move_back_cmd)
-                                        self.gcode.run_script_from_command(cmd_wait_for_stepper)
-                                        time.sleep(0.2)
-                                        logging.info("G1 F3000 Z%s" % Z)
-                                        logging.info(cmd_wait_for_stepper)
-                                        self.gcode.run_script_from_command("G1 F3000 Z%s" % Z)
-                                        self.gcode.run_script_from_command(cmd_wait_for_stepper)
-                                        time.sleep(0.1)
-                                        logging.info("G1 F%s E%s" % (slr_extruder_speed, lastE))
-                                        self.gcode.run_script_from_command("G1 F%s E%s" % (slr_extruder_speed, lastE))
-                                        time.sleep(0.2)
-                                        if print_switch:
-                                            gcode_move.recordPrintFileName(print_file_name_save_path, self.current_file.name, fan_state=self.fan_state)
-                                elif not slr_position:
-                                    self.capture_slr_gphoto()
-                            slr_layer_count += 1
-                            break
                 self.toolhead_moved = False
                 self.gcode.run_script(line)
                 self.count_line += 1
@@ -1002,9 +628,6 @@ class VirtualSD:
                     return self.reactor.NEVER
                 lines = []
                 partial_input = ""
-        if self.do_cancel_status and enable_delay_photography and pre_serial == usb_serial:
-            create_video(timelapse_postion, layer_count, output_framerate, frequency, base_shoot_path,
-                         output_pre_video_path)
         logging.info("Exiting SD card print (position %d)", self.file_position)
         self.count = 0
         self.count_G1 = 0
@@ -1043,7 +666,7 @@ class VirtualSD:
                 import urllib2
                 urllib2.urlopen(url)
             else:
-                from urllib import request, parse
+                from urllib import parse
                 import string
                 new_url = parse.quote(url, safe=string.printable)
                 import urllib.request
@@ -1067,28 +690,6 @@ class VirtualSD:
         time.sleep(5)
         logging.info("use _last_rest_file")
         self._reset_file()
-    def get_yaml_info(self, _config_file=None):
-        import yaml
-        if not os.path.exists(_config_file):
-            return {}
-        config_data = {}
-        try:
-            with open(_config_file, 'r') as f:
-                config_data = yaml.load(f.read(), Loader=yaml.Loader)
-        except Exception as err:
-            pass
-        return config_data
-    def set_yaml_info(self, _config_file=None, data=None):
-        import yaml
-        if not _config_file:
-            return
-        try:
-            with open(_config_file, 'w+') as f:
-                yaml.dump(data, f, allow_unicode=True)
-                f.flush()
-            os.system("sync")
-        except Exception as e:
-            pass
     def _record_local_log(self, end_filename):
         self.local_log_save(end_filename)
         if self.printer.in_shutdown_state:
@@ -1102,7 +703,7 @@ class VirtualSD:
             import urllib2
             urllib2.urlopen(url)
         else:
-            from urllib import request, parse
+            from urllib import parse
             new_url = parse.quote(url, safe=string.printable)
             import urllib.request
             urllib.request.urlopen(new_url)
@@ -1116,7 +717,7 @@ class VirtualSD:
             import urllib2
             urllib2.urlopen(url)
         else:
-            from urllib import request, parse
+            from urllib import parse
             new_url = parse.quote(url, safe=string.printable)
             import urllib.request
             urllib.request.urlopen(new_url)
