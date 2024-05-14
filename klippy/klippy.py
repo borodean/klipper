@@ -237,34 +237,6 @@ class Printer:
             logging.info(info)
         if self.bglogger is not None:
             self.bglogger.set_rollover_info(name, info)
-    def get_yaml_info(self, _config_file=None):
-        """
-        read yaml file info
-        """
-        import yaml
-        if not os.path.exists(_config_file):
-            return {}
-        config_data = {}
-        try:
-            with open(_config_file, 'r') as f:
-                config_data = yaml.load(f.read(), Loader=yaml.Loader)
-        except Exception as err:
-            pass
-        return config_data
-    def set_yaml_info(self, _config_file=None, data=None):
-        """
-        write yaml file info
-        """
-        import yaml
-        if not _config_file:
-            return
-        try:
-            with open(_config_file, 'w+') as f:
-                yaml.dump(data, f, allow_unicode=True)
-                f.flush()
-            os.system("sync")
-        except Exception as e:
-            pass
     def _record_local_log(self, msg):
         global api_server_index
         if msg == "invoke_shutdown":
