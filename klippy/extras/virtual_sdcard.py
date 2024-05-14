@@ -281,9 +281,6 @@ class VirtualSD:
         self.next_file_position = pos
     def is_cmd_from_sd(self):
         return self.cmd_from_sd
-    def record_status(self, path, line_pos):
-        gcode_move = self.printer.lookup_object('gcode_move')
-        gcode_move.cmd_CX_SAVE_GCODE_STATE(self.file_position, path, line_pos)
     def tail_read(self, f):
         cur_pos = f.tell()
         buf = ''

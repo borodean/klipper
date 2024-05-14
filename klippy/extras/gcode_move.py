@@ -228,17 +228,6 @@ class GCodeMove:
         state = self.saved_states.get("M600_state")
         if state is None:
             self.gcode.run_script_from_command("RESUME")
-    cmd_CX_SAVE_GCODE_STATE_help = "CX Save G-Code coordinate state"
-    def cmd_CX_SAVE_GCODE_STATE(self, file_position, path, line_pos):
-        import json
-        from subprocess import call
-        data = {
-            'file_position': file_position,
-            'base_position_e': round(list(self.base_position)[-1], 2),
-        }
-        cmd = "sed -i %sc'%s' %s" % (line_pos, json.dumps(data), path)
-        call(cmd, shell=True)
-    cmd_SAVE_GCODE_STATE_help = "Save G-Code coordinate state"
     def cmd_SAVE_GCODE_STATE(self, gcmd):
         state_name = gcmd.get('NAME', 'default')
         self.saved_states[state_name] = {
