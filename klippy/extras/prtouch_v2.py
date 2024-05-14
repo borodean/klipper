@@ -1099,7 +1099,7 @@ class PRTouchEndstopWrapper:
         configfile = self.printer.lookup_object('configfile')
         configfile.set('prtouch default', 'version', PR_VERSION)
 
-        self.gcode.run_script_from_command('CX_SAVE_CONFIG')
+        self.gcode.run_script_from_command('SAVE_CONFIG')
 
         pass
 

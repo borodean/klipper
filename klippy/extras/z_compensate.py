@@ -324,7 +324,7 @@ class ZCompensateInit:
         self.z_offset_move = 0
         self.cmd_CR10SE_NOZZLE_CLEAR(gcmd)
         self.cmd_Z_OFFSET_CALIBRATION(gcmd)
-        self.printer.lookup_object('configfile').cmd_CX_SAVE_CONFIG(gcmd)
+        self.printer.lookup_object('configfile').cmd_SAVE_CONFIG(gcmd)
         pass
 
 def load_config(config):
