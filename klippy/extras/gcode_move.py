@@ -359,19 +359,6 @@ class GCodeMove:
                 gcode.run_script("M400")
             self.absolute_extrude = state['absolute_extrude']
             gcode.run_script("M221 S%s" % int(state['extrude_factor']*100))
-            try:
-                if os.path.exists(gcode.exclude_object_info):
-                    with open(gcode.exclude_object_info, "r") as f:
-                        exclude_object_cmds = json.loads(f.read())
-                        EXCLUDE_OBJECT_DEFINE = exclude_object_cmds.get("EXCLUDE_OBJECT_DEFINE", [])
-                        EXCLUDE_OBJECT = exclude_object_cmds.get("EXCLUDE_OBJECT", [])
-                        for line in EXCLUDE_OBJECT_DEFINE:
-                            gcode.run_script_from_command(line)
-                        for line in EXCLUDE_OBJECT:
-                            gcode.run_script_from_command(line)
-                        gcode.run_script_from_command("M400")
-            except Exception as err:
-                logging.exception("RESTORE EXCLUDE_OBJECT err:%s" % err)
         except Exception as err:
             logging.exception("cmd_CX_RESTORE_GCODE_STATE err:%s" % err)
     cmd_SAVE_GCODE_STATE_help = "Save G-Code coordinate state"

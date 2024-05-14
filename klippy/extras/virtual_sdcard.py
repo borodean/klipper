@@ -169,8 +169,6 @@ class VirtualSD:
         if self.print_id and self.cur_print_data:
             self.print_id = ""
             self.cur_print_data = {}
-        if os.path.exists(self.gcode.exclude_object_info):
-            os.remove(self.gcode.exclude_object_info)
     # G-Code commands
     def cmd_error(self, gcmd):
         raise gcmd.error("SD write not supported")
@@ -394,8 +392,6 @@ class VirtualSD:
                         os.remove(path)
                     if os.path.exists(print_file_name_save_path):
                         os.remove(print_file_name_save_path)
-                    if os.path.exists(self.gcode.exclude_object_info):
-                        os.remove(self.gcode.exclude_object_info)
                     toolhead = self.printer.lookup_object('toolhead')
                     gcode = self.printer.lookup_object('gcode')
                     if gcode and toolhead and gcode_move and gcode_move.is_delta and gcode_move.is_power_loss:
