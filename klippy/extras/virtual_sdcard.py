@@ -396,62 +396,8 @@ class VirtualSD:
         t = threading.Thread(target=self._record_local_log_start_print)
         t.start()
         print_file_name_save_path = "/mnt/UDISK/%s_print_file_name.save" % pre_serial
-        path2 = "/mnt/UDISK/.crealityprint/print_switch.txt"
-        print_switch = False
-        if os.path.exists(path2):
-            try:
-                with open(path2, "r") as f:
-                    ret = json.loads(f.read())
-                    print_switch = ret.get("switch", False)
-            except Exception as err:
-                pass
         state = {}
-        if print_switch and os.path.exists(path) and os.path.exists(print_file_name_save_path):
-            try:
-                    self.print_stats.note_start(info_path=print_file_name_save_path)
-                    with open(path, "r") as f:
-                        ret = f.readlines()
-                        info = {}
-                        for obj in ret:
-                            obj = obj.strip("'").strip("\n")
-                            if len(obj) > 10:
-                                obj = eval(obj)
-                                if not info:
-                                    info = obj
-                                else:
-                                    if obj.get("file_position", 0) > info.get("file_position", 0):
-                                        info = obj
-                        state = info
-                        if not self.do_resume_status:
-                            self.file_position = int(state.get("file_position", 0))
-                            gcode = self.printer.lookup_object('gcode')
-                            temperature = self.get_print_temperature(self.current_file.name)
-                            gcode.run_script("M140 S%s" % temperature[0])
-                            gcode.run_script("M109 S%s" % temperature[1])
-                            if self.power_loss_pause_flag:
-                                self.pause_flag = 2
-                        if self.pause_flag == 2 and not self.do_resume_status:
-                            pass
-                        elif self.pause_flag == 1 and self.do_resume_status:
-                            pass
-                        elif self.cancel_print_state:
-                            self.pause_flag = 1
-                        elif self.pause_flag == 2 and self.do_resume_status:
-                            self.pause_flag = 1
-                            gcode_move = self.printer.lookup_object('gcode_move', None)
-                            XYZE = self.getXYZE(self.current_file.name, self.file_position)
-                            gcode_move.cmd_CX_RESTORE_GCODE_STATE(path, print_file_name_save_path, XYZE)
-                        else:
-                            self.pause_flag = 1
-                            gcode_move = self.printer.lookup_object('gcode_move', None)
-                            XYZE = self.getXYZE(self.current_file.name, self.file_position)
-                            gcode_move.cmd_CX_RESTORE_GCODE_STATE(path, print_file_name_save_path, XYZE)
-            except Exception as err:
-                logging.exception(err)
-        else:
-            self.print_stats.note_start()
-        if print_switch:
-            gcode_move = self.printer.lookup_object('gcode_move')
+        self.print_stats.note_start()
         self.reactor.unregister_timer(self.work_timer)
         try:
             self.current_file.seek(self.file_position)
@@ -515,16 +461,6 @@ class VirtualSD:
                 next_file_position = self.file_position + len(line) + 1
             self.next_file_position = next_file_position
             try:
-                if print_switch and self.count_G1 >= 20 and self.count % 9 == 0:
-                    if not os.path.exists(path):
-                        with open(path, "w") as f:
-                            f.writelines([" \n", " "])
-                            f.flush()
-                    self.record_status(path, line_pos)
-                    if line_pos == 1:
-                        line_pos = 2
-                    else:
-                        line_pos = 1
                 if line.startswith("M106"):
                     self.fan_state = line.strip("\r").strip("\n")
                 if self.cmd_fan:
