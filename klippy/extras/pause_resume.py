@@ -161,7 +161,7 @@ class PauseResume:
         self.printer.lookup_object('toolhead').move_queue.flush()
     cmd_RESUME_help = ("Resumes the print from a pause")
     def cmd_RESUME(self, gcmd):
-        if not self.is_paused and not self.v_sd.lida_paused:
+        if not self.is_paused:
             gcmd.respond_info("Print is not paused, resume aborted")
             return
         velocity = gcmd.get_float('VELOCITY', self.recover_velocity)
@@ -170,7 +170,6 @@ class PauseResume:
             % (velocity))
         self.send_resume_command()
         self.is_paused = False
-        self.v_sd.lida_paused = False
     cmd_M600_help = ("M600 Pauses the current print")
     def cmd_M600(self, gcmd):
         x = gcmd.get_float("X", 0.)
