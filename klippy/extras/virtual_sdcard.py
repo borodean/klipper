@@ -511,17 +511,6 @@ class VirtualSD:
                 urllib.request.urlopen(new_url)
         except Exception as e:
             logging.exception(e)
-    def timelapse_move(self, print_file_name_save_path, z_upraise):
-        try:
-            result = {}
-            with open(print_file_name_save_path, "r") as f:
-                result = json.loads(f.read())
-            with open(print_file_name_save_path, "w") as f:
-                result["z_toolhead_moved"] = z_upraise
-                f.write(json.dumps(result))
-                f.flush()
-        except Exception as err:
-            logging.error(err)
     def _last_reset_file(self):
         logging.info("will use _last_rest_file after 5s...")
         import time
