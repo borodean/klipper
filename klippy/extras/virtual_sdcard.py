@@ -70,64 +70,8 @@ class VirtualSD:
         self.fan_state = ""
         self.cmd_fan = ""
         self.toolhead_moved = False
-        self.lida_paused = False
-        self.first_layer_start = False
-        self.flow_complete_status = False
-        self.first_layer_complete_status1 = False
-        self.first_layer_complete_status2 = False
-        self.is_lida_error_paused = False
-        self.is_open_ai_foregin_matter = False
         self.print_id = ""
         self.cur_print_data = {}
-    def deal_first_layer_complete_status1(self):
-        logging.info("lida deal_first_layer_complete_status1 start")
-        if self.printer.in_shutdown_state:
-            return
-        try:
-            timeout = 1800
-            url = "http://127.0.0.1:8000/control/command?method=lida_first_layer_complete_status1&filename=%s" % self.file_path()
-            from sys import version_info
-            if version_info.major == 2:
-                import urllib2
-                urllib2.urlopen(url, timeout=timeout)
-            else:
-                import urllib.request
-                import string
-                from urllib import request, parse
-                new_url = parse.quote(url, safe=string.printable)  # aviod SSL verification
-                urllib.request.urlopen(new_url, timeout=timeout)
-            logging.info("lida deal_first_layer_complete_status1 complete")
-        except Exception as e:
-            logging.exception(e)
-    def deal_first_layer_complete_status2(self):
-        logging.info("lida deal_first_layer_complete_status2 start")
-        if self.printer.in_shutdown_state:
-            return
-        try:
-            timeout = 1800
-            url = "http://127.0.0.1:8000/control/command?method=lida_first_layer_complete_status2&filename=%s" % self.file_path()
-            from sys import version_info
-            if version_info.major == 2:
-                import urllib2
-                response = urllib2.urlopen(url, timeout=60*15)
-            else:
-                import urllib.request
-                import string
-                from urllib import request, parse
-                new_url = parse.quote(url, safe=string.printable)  # aviod SSL verification
-                response = urllib.request.urlopen(new_url, timeout=timeout)
-            result = int(json.loads(response.read()).get("data"))
-            logging.info("lida deal_first_layer_complete_status2 complete result=%s" % result)
-            if result != 0:
-                lida_config = self.get_yaml_info("/mnt/UDISK/.crealityprint/lida_config.yaml")
-                logging.info("lida_config is %s" % lida_config)
-                if lida_config.get('is_error_pause'):
-                    self.is_lida_error_paused = True
-                else:
-                    self.gcode.respond_info("Printing quality issue detected")
-        except Exception as e:
-            logging.exception(e)
-        self.first_layer_complete_status2 = True
     def handle_shutdown(self):
         if self.work_timer is not None:
             self.must_pause_work = True
@@ -204,7 +148,6 @@ class VirtualSD:
             logging.error("do_resume work_timer is not None")
             raise self.gcode.error("SD busy")
         self.must_pause_work = False
-        self.is_lida_error_paused = False
         self.work_timer = self.reactor.register_timer(
             self.work_handler, self.reactor.NOW)
     def do_cancel(self):
@@ -274,10 +217,6 @@ class VirtualSD:
         filename = gcmd.get("FILENAME")
         if filename[0] == '/':
             filename = filename[1:]
-        self.first_layer_start = True
-        self.flow_complete_status = False
-        self.first_layer_complete_status1 = False
-        self.is_lida_error_paused = False
         try:
             os.system("rm /tmp/*.temp")
         except:
@@ -363,28 +302,6 @@ class VirtualSD:
         self.file_size = fsize
         self.print_stats.set_current_file(filename)
         return fname
-    def lida_detect(self, fname):
-        try:
-            url = "http://127.0.0.1/control/command?method=lida_first_layer_detect&filename=%s" % (
-                fname)
-            logging.info(url)
-            timeout = 1800
-            from sys import version_info
-            if version_info.major == 2:
-                import urllib2
-                response = urllib2.urlopen(url, timeout=timeout)
-                j_data = json.loads(response.read())
-            else:
-                import urllib.request
-                import string
-                from urllib import request, parse
-                new_url = parse.quote(url, safe=string.printable)  # aviod SSL verification
-                response = urllib.request.urlopen(new_url, timeout=timeout)
-                j_data = json.loads(response.read())
-            logging.info("lida_first_layer_detect result is %s" % j_data.get("data").get("first_layer_result"))
-            self.gcode.respond_info("lida_first_layer_detect result is %s" % j_data.get("data").get("first_layer_result"))
-        except Exception as e:
-            logging.exception(e)
     def cmd_M24(self, gcmd):
         # Start/resume SD print
         self.do_resume()
@@ -629,36 +546,10 @@ class VirtualSD:
     def capture_slr_gphoto(self):
         t = threading.Thread(target=self._capture_slr_gphoto)
         t.start()
-    def flow_detect(self):
-        logging.info("lida flow detect start")
-        if self.printer.in_shutdown_state:
-            return
-        try:
-            timeout = 1800
-            url = "http://127.0.0.1:8000/control/command?method=lida_flow_detect"
-            from sys import version_info
-            if version_info.major == 2:
-                import urllib2
-                urllib2.urlopen(url, timeout=timeout)
-            else:
-                import urllib.request
-                import string
-                from urllib import request, parse
-                new_url = parse.quote(url, safe=string.printable)  # aviod SSL verification
-                urllib.request.urlopen(new_url, timeout=timeout)
-            logging.info("lida flow detect complete")
-        except Exception as e:
-            logging.exception(e)
     # Background work timer
     def work_handler(self, eventtime):
         self.count_line = 0
         filename = os.path.basename(self.current_file.name) if self.current_file else ""
-        lida_config = self.get_yaml_info("/mnt/UDISK/.crealityprint/lida_config.yaml")
-        logging.info("lida_config is %s" % lida_config)
-        if lida_config.get('flow_switch') or lida_config.get("first_layer_switch"):
-            if not os.path.exists("/dev/ttyLaser"):
-                self.gcode.respond_info("lida not exists")
-                self.first_layer_start = False
         import time
         # read slr camera config
         (is_gphoto2,
@@ -1086,56 +977,6 @@ class VirtualSD:
                 self.toolhead_moved = False
                 self.gcode.run_script(line)
                 self.count_line += 1
-                if line.startswith("G28") and self.first_layer_start:
-                    if lida_config.get("printer_id") == self.index:
-                        # flow check
-                        if not os.path.exists("/dev/ttyLaser"):
-                            self.gcode.respond_info("lida not exists")
-                            self.first_layer_start = False
-                            continue
-                        if lida_config.get("flow_switch") and not self.flow_complete_status:
-                            # sleep, wait flow detect complete
-                            t = threading.Thread(target=self.flow_detect)
-                            t.start()
-                            self.gcode.respond_info("lida flow detect start")
-                            while not os.path.exists("/tmp/scan_flow_line_point.temp"):
-                                self.reactor.pause(self.reactor.monotonic() + 5.0)
-                                continue
-                            self.gcode.respond_info("lida flow detect end")
-                            self.flow_complete_status = True
-                            logging.info("G28")
-                            self.gcode.run_script("G28")
-                        # first layer bed check
-                        if lida_config.get("first_layer_switch") and not self.first_layer_complete_status1:
-                            # sleep, wait first_layer_complete_status1 detect complete
-                            t = threading.Thread(target=self.deal_first_layer_complete_status1)
-                            t.start()
-                            self.gcode.respond_info("lida deal_first_layer_complete_status1 start")
-                            while not os.path.exists("/tmp/scan_table_point.temp"):
-                                self.reactor.pause(self.reactor.monotonic() + 5.0)
-                                continue
-                            self.gcode.respond_info("lida deal_first_layer_complete_status1 end")
-                            self.first_layer_complete_status1 = True
-                # # first layer print check
-                if self.first_layer_start and self.first_layer_complete_status1 and not self.first_layer_complete_status2 and lida_config.get("printer_id") == self.index:
-                    if not os.path.exists("/dev/ttyLaser"):
-                        self.gcode.respond_info("lida not exists")
-                        self.first_layer_start = False
-                        continue
-                    for k in LAYER_KEYS:
-                        if line.startswith(k) and line.strip().endswith("1"):
-                            t = threading.Thread(target=self.deal_first_layer_complete_status2)
-                            t.start()
-                            self.gcode.respond_info("lida deal_first_layer_complete_status2 start")
-                            while not self.first_layer_complete_status2:
-                                self.reactor.pause(self.reactor.monotonic() + 5.0)
-                                continue
-                            self.first_layer_start = False
-                            self.gcode.respond_info("lida deal_first_layer_complete_status2 end")
-                            if self.is_lida_error_paused:
-                                self.gcode._respond_error("Printing quality issue detected, printing has been paused")
-                                self.gcode.run_script("PAUSE")
-                            break
                 self.count += 1
                 if self.count_G1 < 20 and line.startswith("G1"):
                     self.count_G1 += 1
