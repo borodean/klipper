@@ -38,12 +38,8 @@ class VirtualSD:
             config, 'on_error_gcode', DEFAULT_ERROR_GCODE)
         if self.printer.start_args.get("apiserver")[-1] != "s":
             self.index = self.printer.start_args.get("apiserver")[-1]
-            with open("/mnt/UDISK/printer_config%s/printer.cfg" % self.index) as f:
-                self.is_laser_print = f.read().startswith("# !Ender-3 Laser")
         else:
             self.index = "1"
-            with open("/mnt/UDISK/printer_config/printer.cfg") as f:
-                self.is_laser_print = f.read().startswith("# !Ender-3 Laser")
         # Register commands
         self.gcode = self.printer.lookup_object('gcode')
         for cmd in ['M20', 'M21', 'M23', 'M24', 'M25', 'M26', 'M27']:
@@ -155,26 +151,25 @@ class VirtualSD:
             self.current_file = None
             self.print_stats.note_cancel()
         self.file_position = self.file_size = 0
-        if not self.is_laser_print:
-            from subprocess import call
-            mcu = self.printer.lookup_object('mcu', None)
-            pre_serial = mcu._serial.serial_dev.port.split("/")[-1]
-            path = "/mnt/UDISK/%s_gcode_coordinate.save" % pre_serial
-            print_file_name_save_path = "/mnt/UDISK/%s_print_file_name.save" % pre_serial
-            if os.path.exists(path):
-                os.remove(path)
-            if os.path.exists(print_file_name_save_path):
-                os.remove(print_file_name_save_path)
-            call("sync", shell=True)
-            gcode_move = self.printer.lookup_object('gcode_move')
-            toolhead = self.printer.lookup_object('toolhead')
-            if toolhead and gcode_move and gcode_move.is_delta and gcode_move.is_power_loss:
-                gcode_move.is_power_loss = False
-                gcode_move.homing_position = gcode_move.homing_position_bak
-            self.update_print_history_info(only_update_status=True, state="cancelled")
-            if self.print_id and self.cur_print_data:
-                self.print_id = ""
-                self.cur_print_data = {}
+        from subprocess import call
+        mcu = self.printer.lookup_object('mcu', None)
+        pre_serial = mcu._serial.serial_dev.port.split("/")[-1]
+        path = "/mnt/UDISK/%s_gcode_coordinate.save" % pre_serial
+        print_file_name_save_path = "/mnt/UDISK/%s_print_file_name.save" % pre_serial
+        if os.path.exists(path):
+            os.remove(path)
+        if os.path.exists(print_file_name_save_path):
+            os.remove(print_file_name_save_path)
+        call("sync", shell=True)
+        gcode_move = self.printer.lookup_object('gcode_move')
+        toolhead = self.printer.lookup_object('toolhead')
+        if toolhead and gcode_move and gcode_move.is_delta and gcode_move.is_power_loss:
+            gcode_move.is_power_loss = False
+            gcode_move.homing_position = gcode_move.homing_position_bak
+        self.update_print_history_info(only_update_status=True, state="cancelled")
+        if self.print_id and self.cur_print_data:
+            self.print_id = ""
+            self.cur_print_data = {}
         if os.path.exists(self.gcode.exclude_object_info):
             os.remove(self.gcode.exclude_object_info)
     # G-Code commands
@@ -425,7 +420,6 @@ class VirtualSD:
         self.count_line = 0
         import time
         # When the nozzle is moved
-        logging.info("********************%s*************" % self.is_laser_print)
         mcu = self.printer.lookup_object('mcu', None)
         pre_serial = mcu._serial.serial_dev.port.split("/")[-1]
         path = "/mnt/UDISK/%s_gcode_coordinate.save" % pre_serial
@@ -445,7 +439,7 @@ class VirtualSD:
             except Exception as err:
                 pass
         state = {}
-        if print_switch and os.path.exists(path) and os.path.exists(print_file_name_save_path) and not self.is_laser_print:
+        if print_switch and os.path.exists(path) and os.path.exists(print_file_name_save_path):
             try:
                     self.print_stats.note_start(info_path=print_file_name_save_path)
                     with open(path, "r") as f:
@@ -489,7 +483,7 @@ class VirtualSD:
                 logging.exception(err)
         else:
             self.print_stats.note_start()
-        if print_switch and not self.is_laser_print:
+        if print_switch:
             gcode_move = self.printer.lookup_object('gcode_move')
         self.reactor.unregister_timer(self.work_timer)
         try:
@@ -557,22 +551,21 @@ class VirtualSD:
             if self.count_line % 4999 == 0:
                 self.update_print_history_info()
             try:
-                if not self.is_laser_print:
-                    if print_switch and self.count_G1 >= 20 and self.count % 9 == 0:
-                        if not os.path.exists(path):
-                            with open(path, "w") as f:
-                                f.writelines([" \n", " "])
-                                f.flush()
-                        self.record_status(path, line_pos)
-                        if line_pos == 1:
-                            line_pos = 2
-                        else:
-                            line_pos = 1
-                    if line.startswith("M106"):
-                        self.fan_state = line.strip("\r").strip("\n")
-                    if self.cmd_fan:
-                        self.fan_state = self.cmd_fan
-                        self.cmd_fan = ""
+                if print_switch and self.count_G1 >= 20 and self.count % 9 == 0:
+                    if not os.path.exists(path):
+                        with open(path, "w") as f:
+                            f.writelines([" \n", " "])
+                            f.flush()
+                    self.record_status(path, line_pos)
+                    if line_pos == 1:
+                        line_pos = 2
+                    else:
+                        line_pos = 1
+                if line.startswith("M106"):
+                    self.fan_state = line.strip("\r").strip("\n")
+                if self.cmd_fan:
+                    self.fan_state = self.cmd_fan
+                    self.cmd_fan = ""
                 if calc_layer_count < 5:
                     for layer_key in LAYER_KEYS:
                         if ";LAYER_COUNT:" in layer_key:
