@@ -33,21 +33,8 @@ class PauseResume:
                                    self._handle_pause_request)
         webhooks.register_endpoint("pause_resume/resume",
                                    self._handle_resume_request)
-        webhooks.register_endpoint("set_extruder_rotation_distance",
-                                   self._set_extruder_rotation_distance_request)
         webhooks.register_endpoint("set_extruder_gear_ratio",
                                    self._set_extruder_gear_ratio_request)
-    def _set_extruder_rotation_distance_request(self, web_request):
-        rotation_distance = web_request.get("rotation_distance", 32.473)
-        if self.config.has_section("extruder"):
-            self.printer.lookup_object('gcode').run_script(
-                "SET_ROTATION_DISTANCE ROTATION_DISTANCE=%s" % rotation_distance)
-        result = {"code": 200, "rotation_distance": float(rotation_distance)}
-        web_request.send(result)
-        import threading
-        t = threading.Thread(target=self.request_restart)
-        t.start()
-        return result
     def _set_extruder_gear_ratio_request(self, web_request):
         Molecule = web_request.get("Molecule", 1.0)
         Denominator = web_request.get("Denominator", 1.0)
