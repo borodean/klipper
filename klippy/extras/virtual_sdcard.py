@@ -274,11 +274,6 @@ class VirtualSD:
         filename = gcmd.get("FILENAME")
         if filename[0] == '/':
             filename = filename[1:]
-        file_path = self._load_file(gcmd, filename, check_subdirs=True)
-        try:
-            self.record_print_history(str(self.current_file.name))
-        except Exception as err:
-            logging.error(err)
         self.first_layer_start = True
         self.flow_complete_status = False
         self.first_layer_complete_status1 = False
@@ -288,42 +283,6 @@ class VirtualSD:
         except:
             pass
         self.do_resume()
-    def get_print_file_metadata(self, filename, filepath="/mnt/UDISK/.crealityprint/upload"):
-        from subprocess import check_output
-        result = {}
-        python_env = "/usr/share/klippy-env/bin/python3"
-        cmd = "%s /usr/share/klipper/klippy/extras/metadata.py -f '%s' -p %s" % (python_env, filename, filepath)
-        try:
-            result = json.loads(check_output(cmd, shell=True).decode("utf-8"))
-        except Exception as err:
-            logging.error(err)
-        return result
-    def record_print_history(self, file_path=""):
-        try:
-            if os.path.exists(file_path):
-                dir_path = os.path.dirname(file_path)
-                file_name = os.path.basename(file_path)
-                metadata_info = self.get_print_file_metadata(filename=file_name, filepath=dir_path)
-                start_time = time.time()
-                self.print_id = str(start_time)
-                metadata = metadata_info.get("metadata", {})
-                if metadata_info.get("metadata", {}) and metadata_info.get("metadata", {}).get("filament_type"):
-                    metadata["model_info"]["MaterialName"] = metadata_info.get("metadata", {})["filament_type"]
-                data = {
-                    "end_time": start_time,
-                    "filament_used": 0,
-                    "filename": file_name,
-                    "metadata": metadata,
-                    "print_duration": 0,
-                    "start_time": start_time,
-                    "status": "in_progress",
-                    "total_duration": 0,
-                }
-                result = {"count": 1, "jobs": [data]}
-                self.cur_print_data = result
-                return
-        except Exception as err:
-            logging.error(err)
     def update_print_history_info(self, only_update_status=False, state="", error_msg=""):
         if self.print_id:
             ret = {}
