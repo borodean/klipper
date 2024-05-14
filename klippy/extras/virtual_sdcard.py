@@ -473,33 +473,6 @@ class VirtualSD:
         else:
             self.print_stats.note_complete()
         return self.reactor.NEVER
-    def local_log_save(self, end_filename):
-        import threading
-        t = threading.Thread(target=self._local_log_save, args=(end_filename,))
-        t.start()
-    def _local_log_save(self, end_filename):
-        logging.info("_local_log_save:%s" % end_filename)
-        try:
-            url = "http://127.0.0.1/control/command?method=local_log_save&index=%s&filename=%s" % (
-                    self.index, end_filename)
-            from sys import version_info
-            if version_info.major == 2:
-                import urllib2
-                urllib2.urlopen(url)
-            else:
-                from urllib import parse
-                import string
-                new_url = parse.quote(url, safe=string.printable)
-                import urllib.request
-                urllib.request.urlopen(new_url)
-        except Exception as e:
-            logging.exception(e)
-    def _last_reset_file(self):
-        logging.info("will use _last_rest_file after 5s...")
-        import time
-        time.sleep(5)
-        logging.info("use _last_rest_file")
-        self._reset_file()
 
 def load_config(config):
     return VirtualSD(config)
