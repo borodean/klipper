@@ -9,6 +9,10 @@ class Config {
     let currProp;
 
     for (const line of source.split(/\r?\n/)) {
+      if (line.startsWith("#*#")) {
+        continue;
+      }
+
       const { indent, content, comment } = line.match(
         /^(?<indent> *)(?<content>.*?)(?:\s*#\s*(?<comment>.*?))?\s*$/,
       ).groups;
@@ -160,6 +164,7 @@ class Config {
 
         if (refProp.value.join("\n") === prop.value.join("\n")) {
           console.log("Using default value for %s.%s", section.name, prop.name);
+          prop.skipDefault = true;
         }
       }
     }
@@ -216,7 +221,11 @@ class Config {
 
           return [
             prefix,
-            ...props.map(({ name, comment, disabled, value }) => {
+            ...props.map(({ skipDefault, name, comment, disabled, value }) => {
+              if (skipDefault && value.length) {
+                return;
+              }
+
               const prefix = disabled ? `# ${name}:` : `${name}:`;
               const postfix = comment ? ` # ${comment}` : "";
 
@@ -244,6 +253,9 @@ class Config {
     }
     if (section.name.startsWith("delayed_gcode")) {
       return "delayed_gcode my_delayed_gcode";
+    }
+    if (section.name.startsWith("fan_generic")) {
+      return "fan_generic extruder_partfan";
     }
     if (section.name.startsWith("filament_switch_sensor")) {
       return "filament_switch_sensor my_sensor";
@@ -276,18 +288,26 @@ class Config {
   }
 
   _getStandardPropName(section, prop) {
-    if (
-      section.name.startsWith("gcode_macro ") &&
-      prop.name.startsWith("variable_")
-    ) {
-      return "variable_<name>";
-    }
     if (section.name === "bed_screws") {
       if (/^screw\d$/.test(prop.name)) {
         return "screw2";
       }
       if (/^screw\d_name$/.test(prop.name)) {
         return "screw2_name";
+      }
+    }
+    if (
+      section.name.startsWith("gcode_macro ") &&
+      prop.name.startsWith("variable_")
+    ) {
+      return "variable_<name>";
+    }
+    if (section.name === "bed_mesh") {
+      if (/^faulty_region_\d_max$/.test(prop.name)) {
+        return "faulty_region_1_max";
+      }
+      if (/^faulty_region_\d_min$/.test(prop.name)) {
+        return "faulty_region_1_min";
       }
     }
     return prop.name;
@@ -331,17 +351,21 @@ const reference = new Config(
   .normalizeValues()
   .mergeSections()
   .copyProps("extruder", "heater_bed", /^pid_K[pid]$/)
+  .copyProps("heater_fan heatbreak_cooling_fan", "fan_generic extruder_partfan")
+  .copyProps("stepper_x", "stepper_a")
+  .copyProps("stepper_a", "stepper_b")
+  .copyProps("stepper_a", "stepper_c")
   .copyProps("stepper_x", "stepper_y")
   .copyProps("stepper_x", "stepper_z")
   .copyProps("tmc2130 stepper_x", "tmc2130 stepper_y")
   .copyProps("tmc2130 stepper_x", "tmc2130 stepper_z")
   .copyProps("tmc2208 stepper_x", "tmc2208 stepper_y")
   .copyProps("tmc2208 stepper_x", "tmc2208 stepper_z")
-  .copyProps("tmc2209 stepper_x", "tmc2209 stepper_y")
-  .copyProps("tmc2209 stepper_x", "tmc2209 stepper_z")
   .copyProps("tmc2209 stepper_x", "tmc2209 stepper_a")
   .copyProps("tmc2209 stepper_x", "tmc2209 stepper_b")
-  .copyProps("tmc2209 stepper_x", "tmc2209 stepper_c");
+  .copyProps("tmc2209 stepper_x", "tmc2209 stepper_c")
+  .copyProps("tmc2209 stepper_x", "tmc2209 stepper_y")
+  .copyProps("tmc2209 stepper_x", "tmc2209 stepper_z");
 
 for (const fn of process.argv.slice(2)) {
   const config = new Config(await readFile(fn, "utf8"))
