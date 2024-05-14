@@ -222,7 +222,7 @@ class Config {
           return [
             prefix,
             ...props.map(({ skipDefault, name, comment, disabled, value }) => {
-              if (skipDefault && value.length) {
+              if (skipDefault && (value.length || disabled)) {
                 return;
               }
 
