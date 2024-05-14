@@ -166,7 +166,6 @@ class VirtualSD:
         if toolhead and gcode_move and gcode_move.is_delta and gcode_move.is_power_loss:
             gcode_move.is_power_loss = False
             gcode_move.homing_position = gcode_move.homing_position_bak
-        self.update_print_history_info(only_update_status=True, state="cancelled")
         if self.print_id and self.cur_print_data:
             self.print_id = ""
             self.cur_print_data = {}
@@ -211,38 +210,6 @@ class VirtualSD:
         except:
             pass
         self.do_resume()
-    def update_print_history_info(self, only_update_status=False, state="", error_msg=""):
-        if self.print_id:
-            ret = {}
-            try:
-                update_obj = None
-                index = -1
-                ret = self.cur_print_data
-                if ret and ret.get("jobs", []):
-                    print_list = ret.get("jobs", [])
-                    for obj in print_list:
-                        if obj.get("start_time", "") and str(obj.get("start_time", "")) == self.print_id:
-                            index = print_list.index(obj)
-                            update_obj = obj
-                            if not only_update_status:
-                                update_obj["filament_used"] = self.print_stats.filament_used
-                                update_obj["print_duration"] = self.print_stats.print_duration
-                                update_obj["total_duration"] = self.print_stats.total_duration
-                            update_obj["end_time"] = time.time()
-                            if not state:
-                                state = "in_progress"
-                            if error_msg:
-                                update_obj["error_msg"] = error_msg
-                            update_obj["status"] = state
-                            if only_update_status and self.print_id and (state == "error" or state == "completed") and os.path.exists("/dev/video0"):
-                                update_obj["jpg_filename"] = "%s.jpg" % self.print_id
-                                time.sleep(0.2)
-                if index != -1:
-                    print_list[index] = update_obj
-                    ret["jobs"] = print_list
-                    self.cur_print_data = ret
-            except Exception as err:
-                logging.error(err)
     def cmd_M20(self, gcmd):
         # List SD card
         files = self.get_file_list()
@@ -525,7 +492,6 @@ class VirtualSD:
                     if gcode and toolhead and gcode_move and gcode_move.is_delta and gcode_move.is_power_loss:
                         gcode_move.is_power_loss = False
                         gcode_move.homing_position = gcode_move.homing_position_bak
-                    self.update_print_history_info(only_update_status=True, state="completed")
                     time.sleep(0.2)
                     self.cur_print_data = {}
                     self.print_id = ""
@@ -548,8 +514,6 @@ class VirtualSD:
             else:
                 next_file_position = self.file_position + len(line) + 1
             self.next_file_position = next_file_position
-            if self.count_line % 4999 == 0:
-                self.update_print_history_info()
             try:
                 if print_switch and self.count_G1 >= 20 and self.count % 9 == 0:
                     if not os.path.exists(path):
