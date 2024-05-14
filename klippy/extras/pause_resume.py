@@ -33,21 +33,12 @@ class PauseResume:
                                    self._handle_pause_request)
         webhooks.register_endpoint("pause_resume/resume",
                                    self._handle_resume_request)
-        webhooks.register_endpoint("extruder_rotation_distance",
-                                   self._handle_extruder_rotation_distance_request)
         webhooks.register_endpoint("extruder_gear_ratio",
                                    self._handle_extruder_gear_ratio_request)
         webhooks.register_endpoint("set_extruder_rotation_distance",
                                    self._set_extruder_rotation_distance_request)
         webhooks.register_endpoint("set_extruder_gear_ratio",
                                    self._set_extruder_gear_ratio_request)
-    def _handle_extruder_rotation_distance_request(self, web_request):
-        rotation_dist = 32.473
-        if self.config.has_section("extruder"):
-            rotation_dist = self.config.getsection("extruder").getfloat('rotation_distance', above=0., note_valid=False)
-        result = {"code": 200, "rotation_distance": rotation_dist}
-        web_request.send(result)
-        return result
     def _handle_extruder_gear_ratio_request(self, web_request):
         gear_ratio = [1.0, 1.0]
         try:
