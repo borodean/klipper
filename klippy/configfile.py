@@ -155,8 +155,6 @@ class PrinterConfig:
                                desc=self.cmd_SAVE_CONFIG_help)
         gcode.register_command("REMOVE_MCU_RPI_CONFIG", self.cmd_remove_mcu_rpi_CONFIG,
                                desc=self.cmd_remove_mcu_rpi_CONFIG_help)
-        gcode.register_command("SET_ROTATION_DISTANCE", self.cmd_SET_ROTATION_DISTANCE,
-                               desc=self.cmd_SET_ROTATION_DISTANCE_help)
         gcode.register_command("SET_GEAR_RATIO", self.cmd_SET_GEAR_RATIO,
                                desc=self.cmd_SET_GEAR_RATIO_help)
     def get_printer(self):
@@ -480,41 +478,6 @@ class PrinterConfig:
                 if not rotation_distance_write_state:
                     new_lines.insert(start_index + 1, key)
 
-                with open(cfg_path, "w+") as f:
-                    f.writelines(new_lines)
-                    f.flush()
-
-    cmd_SET_ROTATION_DISTANCE_help = "Overwrite config file cmd_SET_ROTATION_DISTANCE"
-
-    def cmd_SET_ROTATION_DISTANCE(self, gcmd):
-        if gcmd.get("ROTATION_DISTANCE") == None:
-            return
-        key = "rotation_distance: %s\n" % gcmd.get("ROTATION_DISTANCE")
-        cfg_path = self.printer.get_start_args()['config_file']
-        flag = False
-        start_index = 0
-        end_index = 0
-        with open(cfg_path) as f:
-            lines = f.readlines()
-            for index, line in enumerate(lines):
-                if line.startswith("#"):
-                    continue
-                if line.startswith("[extruder]"):
-                    flag = True
-                    start_index = index
-                if flag == True and line.startswith("[") and not line.startswith("[extruder]"):
-                    end_index = index
-                    break
-            if start_index > 0 and end_index > start_index:
-                import copy
-                new_lines = copy.deepcopy(lines)
-                rotation_distance_write_state = False
-                for index, line in enumerate(lines):
-                    if start_index < index < end_index and line.startswith("rotation_distance"):
-                        new_lines[index] = key
-                        rotation_distance_write_state = True
-                if not rotation_distance_write_state:
-                    new_lines.insert(start_index + 1, key)
                 with open(cfg_path, "w+") as f:
                     f.writelines(new_lines)
                     f.flush()
