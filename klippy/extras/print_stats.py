@@ -19,7 +19,6 @@ class PrintStats:
             self.index = printer.start_args.get("apiserver")[-1]
         else:
             self.index = "1"
-        self.last_new_total_print_time = self.last_total_print_time = self.new_total_print_time = self.get_last_total_print_time()
         self.print_duration = 0
     def _update_filament_usage(self, eventtime):
         gc_status = self.gcode_move.get_status(eventtime)
@@ -56,7 +55,6 @@ class PrintStats:
             self.last_pause_time = None
         self.state = "printing"
         self.error_message = ""
-        self.last_new_total_print_time = self.last_total_print_time = self.new_total_print_time = self.get_last_total_print_time()
     def note_pause(self):
         if self.last_pause_time is None:
             curtime = self.reactor.monotonic()
@@ -125,10 +123,6 @@ class PrintStats:
                 self.init_duration = self.total_duration - time_paused
         print_duration = self.total_duration - self.init_duration - time_paused
         self.print_duration = print_duration
-        self.new_total_print_time = print_duration/60 + self.last_total_print_time
-        if self.new_total_print_time > self.last_new_total_print_time:
-            self.set_total_print_time(self.new_total_print_time)
-            self.last_new_total_print_time = self.new_total_print_time
         return {
             'filename': self.filename,
             'total_duration': self.total_duration,
@@ -139,18 +133,6 @@ class PrintStats:
             'info': {'total_layer': self.info_total_layer,
                      'current_layer': self.info_current_layer}
         }
-    def get_last_total_print_time(self):
-        try:
-            with open('/mnt/UDISK/.crealityprint/printer%s_totaltime' % self.index) as f:
-                return int(f.read())
-        except:
-            return 0
-    def set_total_print_time(self, new_total_print_time):
-        try:
-            with open('/mnt/UDISK/.crealityprint/printer%s_totaltime' % self.index, "w+") as f:
-                f.write(str(int(new_total_print_time)))
-        except:
-            pass
 
 def load_config(config):
     return PrintStats(config)
