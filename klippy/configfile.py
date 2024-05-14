@@ -385,7 +385,6 @@ class PrinterConfig:
                            "with included value" % (section, option))
                     raise gcode.error(msg)
     cmd_SAVE_CONFIG_help = "Overwrite config file and restart"
-
     def cmd_SAVE_CONFIG(self, gcmd):
         if not self.autosave.fileconfig.sections():
             return
@@ -424,11 +423,8 @@ class PrinterConfig:
             f = open(temp_name, 'w')
             f.write(data)
             f.close()
-            os.system("sync")
             os.rename(cfgname, backup_name)
-            os.system("sync")
             os.rename(temp_name, cfgname)
-            os.system("sync")
         except:
             msg = "Unable to write config file during SAVE_CONFIG"
             logging.exception(msg)
