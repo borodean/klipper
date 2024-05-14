@@ -33,11 +33,6 @@ class PauseResume:
                                    self._handle_pause_request)
         webhooks.register_endpoint("pause_resume/resume",
                                    self._handle_resume_request)
-    def request_restart(self):
-        import time
-        time.sleep(1)
-        gcode = self.printer.lookup_object('gcode')
-        gcode.request_restart('restart')
     def handle_connect(self):
         self.v_sd = self.printer.lookup_object('virtual_sdcard', None)
     def _handle_cancel_request(self, web_request):
