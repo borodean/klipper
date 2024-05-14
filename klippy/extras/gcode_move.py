@@ -228,42 +228,6 @@ class GCodeMove:
         state = self.saved_states.get("M600_state")
         if state is None:
             self.gcode.run_script_from_command("RESUME")
-    def recordPrintFileName(self, path, file_name, fan_state="", filament_used=0, last_print_duration=0):
-        import json, os
-        fan = ""
-        old_filament_used = 0
-        old_last_print_duration = 0
-        if os.path.exists(path):
-            with open(path, "r") as f:
-                result = (json.loads(f.read()))
-                fan = result.get("fan_state", "")
-                old_filament_used = result.get("filament_used", 0)
-                old_last_print_duration = result.get("last_print_duration", 0)
-        if fan_state and fan_state != fan:
-            state = fan_state
-        else:
-            state = fan
-        if filament_used and filament_used != old_filament_used:
-            pass
-        else:
-            filament_used = old_filament_used
-        if last_print_duration and last_print_duration != old_last_print_duration:
-            pass
-        else:
-            last_print_duration = old_last_print_duration
-        data = {
-            'file_path': file_name,
-            'absolute_coord': self.absolute_coord,
-            'absolute_extrude': self.absolute_extrude,
-            'speed_factor': self.speed_factor,
-            'extrude_factor': self.extrude_factor,
-            'fan_state': state,
-            'filament_used': filament_used,
-            'last_print_duration': last_print_duration,
-        }
-        with open(path, "w") as f:
-            f.write(json.dumps(data))
-            f.flush()
     cmd_CX_SAVE_GCODE_STATE_help = "CX Save G-Code coordinate state"
     def cmd_CX_SAVE_GCODE_STATE(self, file_position, path, line_pos):
         import json

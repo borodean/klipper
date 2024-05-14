@@ -491,7 +491,6 @@ class VirtualSD:
             self.print_stats.note_start()
         if print_switch and not self.is_laser_print:
             gcode_move = self.printer.lookup_object('gcode_move')
-            gcode_move.recordPrintFileName(print_file_name_save_path, self.current_file.name)
         self.reactor.unregister_timer(self.work_timer)
         try:
             self.current_file.seek(self.file_position)
@@ -505,9 +504,7 @@ class VirtualSD:
         lines = []
         error_message = None
         gcode_move = self.printer.lookup_object('gcode_move')
-        lastE = 0
         line_pos = 1
-        isCurUSB = True if pre_serial == usb_serial else False
         end_filename = self.file_path()
         while not self.must_pause_work:
             if not lines:
@@ -571,26 +568,11 @@ class VirtualSD:
                             line_pos = 2
                         else:
                             line_pos = 1
-                    if print_switch and self.count_G1 == 19:
-                        gcode_move.recordPrintFileName(print_file_name_save_path, self.current_file.name, fan_state=self.fan_state, filament_used=self.print_stats.filament_used, last_print_duration=self.print_stats.print_duration)
-                    if print_switch and self.count % 29 == 0:
-                        gcode_move.recordPrintFileName(print_file_name_save_path, self.current_file.name, fan_state=self.fan_state, filament_used=self.print_stats.filament_used, last_print_duration=self.print_stats.print_duration)
-                    if line.startswith("G1") and "E" in line:
-                        try:
-                            E_str = line.split(" ")[-1]
-                            if E_str.startswith("E"):
-                                lastE = float(E_str.strip("\r").strip("\n")[1:])
-                        except Exception as err:
-                            pass
-                    elif line.startswith("M106"):
+                    if line.startswith("M106"):
                         self.fan_state = line.strip("\r").strip("\n")
-                        if print_switch:
-                            gcode_move.recordPrintFileName(print_file_name_save_path, self.current_file.name, fan_state=self.fan_state)
                     if self.cmd_fan:
                         self.fan_state = self.cmd_fan
                         self.cmd_fan = ""
-                        if print_switch:
-                            gcode_move.recordPrintFileName(print_file_name_save_path, self.current_file.name, fan_state=self.fan_state)
                 if calc_layer_count < 5:
                     for layer_key in LAYER_KEYS:
                         if ";LAYER_COUNT:" in layer_key:
