@@ -25,7 +25,7 @@ class Config {
         { comment },
       ));
 
-      if (!includeComments || !comment) {
+      if (content || !includeComments || !comment) {
         continue;
       }
 
