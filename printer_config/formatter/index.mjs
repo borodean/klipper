@@ -22,6 +22,7 @@ class Config {
         content,
         currSection,
         currProp,
+        { comment },
       ));
 
       if (!includeComments || !comment) {
@@ -32,7 +33,7 @@ class Config {
         comment,
         currSection,
         currProp,
-        true,
+        { disabled: true },
       ));
     }
   }
@@ -208,23 +209,26 @@ class Config {
   toString() {
     return (
       this.sections
-        .map(({ name, disabled, props }) => {
-          const prefix = disabled ? `# [${name}]` : `[${name}]`;
+        .map(({ name, comment, disabled, props }) => {
+          const prefix = `${disabled ? "# " : ""}[${name}]${
+            comment ? ` # ${comment}` : ""
+          }`;
 
           return [
             prefix,
-            ...props.map(({ name, disabled, value }) => {
+            ...props.map(({ name, comment, disabled, value }) => {
               const prefix = disabled ? `# ${name}:` : `${name}:`;
+              const postfix = comment ? ` # ${comment}` : "";
 
               if (value.length === 0) {
-                return prefix;
+                return `${prefix}${postfix}`;
               }
 
               if (value.length === 1) {
-                return `${prefix} ${value[0]}`;
+                return `${prefix} ${value[0]}${postfix}`;
               }
 
-              return `${prefix}\n${value.join("\n")}`;
+              return `${prefix}${postfix}\n${value.join("\n")}`;
             }),
           ]
             .filter(Boolean)
@@ -289,11 +293,11 @@ class Config {
     return prop.name;
   }
 
-  _parseLine(part, currSection, currProp, disabled = false) {
+  _parseLine(part, currSection, currProp, { comment, disabled = false } = {}) {
     let match;
 
     if ((match = part.match(/^\[(?<name>[^\]]+)\].*$/))) {
-      currSection = { name: match.groups.name, disabled, props: [] };
+      currSection = { name: match.groups.name, comment, disabled, props: [] };
       this.sections.push(currSection);
     } else if (
       currSection &&
@@ -301,6 +305,7 @@ class Config {
     ) {
       currProp = {
         name: match.groups.name,
+        comment,
         disabled,
         value: match.groups.value ? [match.groups.value] : [],
       };
