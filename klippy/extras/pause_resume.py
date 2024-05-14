@@ -33,26 +33,10 @@ class PauseResume:
                                    self._handle_pause_request)
         webhooks.register_endpoint("pause_resume/resume",
                                    self._handle_resume_request)
-        webhooks.register_endpoint("extruder_gear_ratio",
-                                   self._handle_extruder_gear_ratio_request)
         webhooks.register_endpoint("set_extruder_rotation_distance",
                                    self._set_extruder_rotation_distance_request)
         webhooks.register_endpoint("set_extruder_gear_ratio",
                                    self._set_extruder_gear_ratio_request)
-    def _handle_extruder_gear_ratio_request(self, web_request):
-        gear_ratio = [1.0, 1.0]
-        try:
-            if self.config.has_section("extruder"):
-                gear_ratio = self.config.getsection("extruder").getlists('gear_ratio', (1.0, 1.0), seps=(':', ','),
-                                                                         count=2, parser=float, note_valid=False)
-                if isinstance(gear_ratio[0], tuple):
-                    gear_ratio = gear_ratio[0]
-        except Exception as err:
-            import logging
-            logging.error(err)
-        result = {"code": 200, "gear_ratio": {"Molecule": gear_ratio[0], "Denominator": gear_ratio[1]}}
-        web_request.send(result)
-        return result
     def _set_extruder_rotation_distance_request(self, web_request):
         rotation_distance = web_request.get("rotation_distance", 32.473)
         if self.config.has_section("extruder"):
