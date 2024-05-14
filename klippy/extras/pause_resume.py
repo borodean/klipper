@@ -33,20 +33,6 @@ class PauseResume:
                                    self._handle_pause_request)
         webhooks.register_endpoint("pause_resume/resume",
                                    self._handle_resume_request)
-        webhooks.register_endpoint("set_extruder_gear_ratio",
-                                   self._set_extruder_gear_ratio_request)
-    def _set_extruder_gear_ratio_request(self, web_request):
-        Molecule = web_request.get("Molecule", 1.0)
-        Denominator = web_request.get("Denominator", 1.0)
-        gear_ratio = "%s:%s" % (Molecule, Denominator)
-        if self.config.has_section("extruder"):
-            self.printer.lookup_object('gcode').run_script("SET_GEAR_RATIO GEAR_RATIO=%s" % gear_ratio)
-        result = {"code": 200, "Molecule": float(Molecule), "Denominator": float(Denominator)}
-        web_request.send(result)
-        import threading
-        t = threading.Thread(target=self.request_restart)
-        t.start()
-        return result
     def request_restart(self):
         import time
         time.sleep(1)
