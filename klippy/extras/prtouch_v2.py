@@ -29,17 +29,17 @@ PR_VERSION = 307
 # SAFE_DOWN_Z DOWN_DIS=10 UP_DIS=5
 
 
-PR_ERR_CODE_PRES_READ_DATA_TIMEOUT  = {'code':'key520', 'msg':'PR_ERR_CODE_PRES_READ_DATA_TIMEOUT: The data read interval is too large, need=11ms, actual={0}.', 'values':[]}
-PR_ERR_CODE_PRES_VAL_IS_CONSTANT    = {'code':'key521', 'msg':'PR_ERR_CODE_PRES_VAL_IS_CONSTANT: The pressure data for channel={0} is incorrect. The value is constant {1}.', 'values':[]}
-PR_ERR_CODE_PRES_NOT_BE_SENSED      = {'code':'key522', 'msg':'PR_ERR_CODE_PRES_NOT_BE_SENSED: The pressure data in channel={0} cannot be properly sensed.', 'values':[]}
-PR_ERR_CODE_PRES_LOST_RUN_DATA      = {'code':'key523', 'msg':'PR_ERR_CODE_PRES_LOST_RUN_DATA: The pressure data is lost when the probe is over and waiting for the data to be sent back.', 'values':[]}
-PR_ERR_CODE_PRES_NOISE_TOO_BIG      = {'code':'key524', 'msg':'PR_ERR_CODE_PRES_NOISE_TOO_BIG: Sensor data noise is too big, channel={0}.', 'values':[]}
-PR_ERR_CODE_HAVE_LOST_STEP          = {'code':'key526', 'msg':'PR_ERR_CODE_HAVE_LOST_STEP: Z-axis motor step loss was found.', 'values':[]}
-PR_ERR_CODE_STEP_LOST_RUN_DATA      = {'code':'key527', 'msg':'PR_ERR_CODE_STEP_LOST_RUN_DATA: The motor step data is lost when the probe is over and waiting for data return', 'values':[]}
-PR_ERR_CODE_G28_Z_DETECTION_TIMEOUT = {'code':'key529', 'msg':'PR_ERR_CODE_G28_Z_DETECTION_TIMEOUT: G28 Z try probe out of times.', 'values':[]}
-PR_ERR_CODE_G28_Z_DETECTION_ERROR   = {'code':'key530', 'msg':'PR_ERR_CODE_G28_Z_DETECTION_ERROR: G28 Z probe ERROR.', 'values':[]}
-PR_ERR_CODE_SWAP_PIN_DETECTI        = {'code':'key532', 'msg':'PR_ERR_CODE_SWAP_PIN_DETECTI: The synchronization pin test failed, pres_swap_pin={0}, step_swap_pin={1}.', 'values':[]}
-PR_ERR_CODE_CK_BED_MESH_OUT_RANGE   = {'code':'key533', 'msg':'PR_ERR_CODE_CK_BED_MESH_OUT_RANGE: A hot bed tilting procedure that differs too much from bed_mesh data.', 'values':[]}
+ERR_PRES_READ_DATA_TIMEOUT  = 'The data read interval is too large, need=11ms, actual=%s'
+ERR_PRES_VAL_IS_CONSTANT    = 'The pressure data for channel=%s is incorrect. The value is constant %s'
+ERR_PRES_NOT_BE_SENSED      = 'The pressure data in channel=%s cannot be properly sensed'
+ERR_PRES_LOST_RUN_DATA      = 'The pressure data is lost when the probe is over and waiting for the data to be sent back'
+ERR_PRES_NOISE_TOO_BIG      = 'Sensor data noise is too big, channel=%s'
+ERR_HAVE_LOST_STEP          = 'Z-axis motor step loss was found'
+ERR_STEP_LOST_RUN_DATA      = 'The motor step data is lost when the probe is over and waiting for data return'
+ERR_G28_Z_DETECTION_TIMEOUT = 'G28 Z try probe out of times'
+ERR_G28_Z_DETECTION_ERROR   = 'G28 Z probe ERROR'
+ERR_SWAP_PIN_DETECTI        = 'The synchronization pin test failed, pres_swap_pin=%s, step_swap_pin=%s'
+ERR_CK_BED_MESH_OUT_RANGE   = 'A hot bed tilting procedure that differs too much from bed_mesh data'
 
 MAX_PRES_CNT = 4
 MAX_BUF_LEN = 32
@@ -359,7 +359,7 @@ class PRTouchEndstopWrapper:
             pass
         pass
 
-    def ck_and_raise_error(self, ck, err_code, vals=[]):
+    def ck_and_raise_error(self, ck, err, vals=[]):
         if not ck:
             return
         self.enable_steps()
@@ -373,11 +373,11 @@ class PRTouchEndstopWrapper:
         self.toolhead.set_position(now_pos[:2] + [0, now_pos[3]], homing_axes=[2])
 
         self.disable_steps()
-        err_code['values'] = vals
-        self.print_msg('RAISE_ERROR', str(err_code), True)
-        err_code['msg'] = 'Shutdown due to ' + err_code['msg']
-        self.printer.invoke_shutdown(str(err_code))
-        raise self.printer.command_error(str(err_code))
+        msg = err % tuple(vals)
+        self.print_msg('RAISE_ERROR', msg, True)
+        shutdown_msg = 'Shutdown due to ' + msg
+        self.printer.invoke_shutdown(shutdown_msg)
+        raise self.printer.command_error(shutdown_msg)
 
     def send_wave_tri(self, ch, ary):
         msg = '%d' % ch
@@ -514,7 +514,7 @@ class PRTouchEndstopWrapper:
     def ck_and_manual_get_step(self):
         if len(self.step_res) == MAX_BUF_LEN:
             return
-        self.ck_and_raise_error(len(self.step_res) < MAX_BUF_LEN / 4, PR_ERR_CODE_STEP_LOST_RUN_DATA, [len(self.step_res)])
+        self.ck_and_raise_error(len(self.step_res) < MAX_BUF_LEN / 4, ERR_STEP_LOST_RUN_DATA, [len(self.step_res)])
         self.print_msg('CK_AND_MANUAL_GET_STEP', 'need=%d, recv=%d' % (MAX_BUF_LEN, len(self.step_res)))
 
         for i in range(0, MAX_BUF_LEN, 4):
@@ -527,13 +527,13 @@ class PRTouchEndstopWrapper:
                 sdir = {'tick': params['tick%d' % j] / 10000., 'step': params['step%d' % j], 'index': params['index']}
                 self.step_res.insert(i + j, sdir)
 
-        self.ck_and_raise_error(len(self.step_res) != MAX_BUF_LEN, PR_ERR_CODE_STEP_LOST_RUN_DATA, [len(self.step_res)])
+        self.ck_and_raise_error(len(self.step_res) != MAX_BUF_LEN, ERR_STEP_LOST_RUN_DATA, [len(self.step_res)])
         pass
 
     def ck_and_manual_get_pres(self):
         if len(self.pres_res) == MAX_BUF_LEN:
             return
-        self.ck_and_raise_error(len(self.pres_res) < MAX_BUF_LEN / 4, PR_ERR_CODE_PRES_LOST_RUN_DATA, [len(self.pres_res)])
+        self.ck_and_raise_error(len(self.pres_res) < MAX_BUF_LEN / 4, ERR_PRES_LOST_RUN_DATA, [len(self.pres_res)])
 
         self.print_msg('CK_AND_MANUAL_GET_PRES', 'need=%d, recv=%d' % (MAX_BUF_LEN, len(self.pres_res)))
         for i in range(0, MAX_BUF_LEN, 2):
@@ -548,7 +548,7 @@ class PRTouchEndstopWrapper:
                 rdir = {'tick':params['tick_%d' % j] / 10000., 'ch0': params['ch0_%d' % j], 'ch1': params['ch1_%d' % j], 'ch2': params['ch2_%d' % j], 'ch3': params['ch3_%d' % j], 'index': params['index']}
                 self.pres_res.insert(i + j, rdir)
 
-        self.ck_and_raise_error(len(self.pres_res) != MAX_BUF_LEN, PR_ERR_CODE_PRES_LOST_RUN_DATA, [len(self.pres_res)])
+        self.ck_and_raise_error(len(self.pres_res) != MAX_BUF_LEN, ERR_PRES_LOST_RUN_DATA, [len(self.pres_res)])
         pass
 
     def get_valid_ch(self):
@@ -680,7 +680,7 @@ class PRTouchEndstopWrapper:
         self.write_swap_prtouch_cmd.send([self.pres_oid, 1])
         params1 = self.read_swap_prtouch_cmd.send([self.step_oid])
         self.ck_and_raise_error(not params0 or not params1 or params0['sta'] != 0 or params1['sta'] != 1,
-                                PR_ERR_CODE_SWAP_PIN_DETECTI, [self.pres_swap_pin, self.step_swap_pin])
+                                ERR_SWAP_PIN_DETECTI, [self.pres_swap_pin, self.step_swap_pin])
         self.print_msg('DEBUG', '--Self Test 1 = PR_ERR_CODE_SWAP_PIN_DETECTI, Pass!!--', force)
 
         if not self.need_self_check and not force:
@@ -694,7 +694,7 @@ class PRTouchEndstopWrapper:
         while ((time.time() - start_tick_s) < (1.5 * (self.tri_acq_ms / 1000.) * 64)) and len(self.pres_res) < 32:
             self.delay_s(0.010)
         self.read_pres_prtouch_cmd.send([self.pres_oid, self.tri_acq_ms, 0])
-        self.ck_and_raise_error(len(self.pres_res) < 32, PR_ERR_CODE_PRES_READ_DATA_TIMEOUT, [32, len(self.pres_res)])
+        self.ck_and_raise_error(len(self.pres_res) < 32, ERR_PRES_READ_DATA_TIMEOUT, [32, len(self.pres_res)])
 
         pnt_tick, pnt_vals = [], [[], [], [], []]
         for i in range(4, len(self.pres_res) - 4):
@@ -706,7 +706,7 @@ class PRTouchEndstopWrapper:
             tr += pnt_tick[i] - pnt_tick[i - 1]
         self.print_msg('SELF_CHECK_TICK', str(pnt_tick))
         self.print_msg('SELF_CHECK_DATA', str(pnt_vals))
-        self.ck_and_raise_error(tr / (len(pnt_tick) - 1) > 2 * self.tri_acq_ms, PR_ERR_CODE_PRES_READ_DATA_TIMEOUT, [self.tri_acq_ms, tr / (len(pnt_tick) - 1)])
+        self.ck_and_raise_error(tr / (len(pnt_tick) - 1) > 2 * self.tri_acq_ms, ERR_PRES_READ_DATA_TIMEOUT, [self.tri_acq_ms, tr / (len(pnt_tick) - 1)])
         self.print_msg('DEBUG', '--Self Test 2 = PR_ERR_CODE_PRES_READ_DATA_TIMEOUT, Pass!!--', force)
 
         # 3. PR_ERR_CODE_PRES_VAL_IS_CONSTANT
@@ -715,7 +715,7 @@ class PRTouchEndstopWrapper:
             for j in range(len(pnt_vals[i])):
                 pnt_vals[i][j] -= avg
                 sums += math.fabs(pnt_vals[i][j])
-            self.ck_and_raise_error(not sums, PR_ERR_CODE_PRES_VAL_IS_CONSTANT)
+            self.ck_and_raise_error(not sums, ERR_PRES_VAL_IS_CONSTANT)
         self.print_msg('DEBUG', '--Self Test 3 = PR_ERR_CODE_PRES_VAL_IS_CONSTANT, Pass!!--', force)
 
         # 4. PR_ERR_CODE_PRES_NOISE_TOO_BIG
@@ -723,7 +723,7 @@ class PRTouchEndstopWrapper:
             big_cnt = 0
             for j in range(len(pnt_vals[i])):
                 big_cnt += (1 if math.fabs(pnt_vals[i][j]) > (self.tri_min_hold if not self.use_adc else 200) else 0)
-            self.ck_and_raise_error(big_cnt > len(pnt_vals[i]) / 2, PR_ERR_CODE_PRES_NOISE_TOO_BIG)
+            self.ck_and_raise_error(big_cnt > len(pnt_vals[i]) / 2, ERR_PRES_NOISE_TOO_BIG)
         self.print_msg('DEBUG', '--Self Test 4 = PR_ERR_CODE_PRES_NOISE_TOO_BIG, Pass!!--', force=force)
 
         # 4. PR_ERR_CODE_PRES_NOT_BE_SENSED
@@ -737,7 +737,7 @@ class PRTouchEndstopWrapper:
         while ((time.time() - start_tick_s) < (1.5 * (self.tri_acq_ms / 1000.) * 64)) and len(self.pres_res) < 32:
             self.delay_s(0.010)
         self.read_pres_prtouch_cmd.send([self.pres_oid, self.tri_acq_ms, 0])
-        self.ck_and_raise_error(len(self.pres_res) < 32, PR_ERR_CODE_PRES_READ_DATA_TIMEOUT, [32, len(self.pres_res)])
+        self.ck_and_raise_error(len(self.pres_res) < 32, ERR_PRES_READ_DATA_TIMEOUT, [32, len(self.pres_res)])
         pnt_tick, pnt_vals = [], [[], [], [], []]
         for i in range(4, len(self.pres_res) - 4):
             pnt_tick.append(self.pres_res[i]['tick'] / 10000.)
@@ -747,7 +747,7 @@ class PRTouchEndstopWrapper:
             low_cnt = 0
             for j in range(len(pnt_vals[i])):
                 low_cnt += (1 if abs(pnt_vals[i][j]) < (200 if self.use_adc else 500) else 0)
-            self.ck_and_raise_error(low_cnt > len(pnt_vals[i]) / 2, PR_ERR_CODE_PRES_NOT_BE_SENSED)
+            self.ck_and_raise_error(low_cnt > len(pnt_vals[i]) / 2, ERR_PRES_NOT_BE_SENSED)
         self.print_msg('DEBUG', '--Self Test 5 = PR_ERR_CODE_PRES_NOT_BE_SENSED, Pass!!--', force)
         pass
 
@@ -874,8 +874,8 @@ class PRTouchEndstopWrapper:
                 self.delay_s(0.010)
             self.start_step_prtouch_cmd.send([self.step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
             self.read_pres_prtouch_cmd.send([self.pres_oid, self.tri_acq_ms, 0])
-            self.ck_and_raise_error(len(self.step_res) != MAX_BUF_LEN, PR_ERR_CODE_STEP_LOST_RUN_DATA, [len(self.step_res)])
-            self.ck_and_raise_error(len(self.pres_res) <= 0, PR_ERR_CODE_PRES_LOST_RUN_DATA, [len(self.pres_res)])
+            self.ck_and_raise_error(len(self.step_res) != MAX_BUF_LEN, ERR_STEP_LOST_RUN_DATA, [len(self.step_res)])
+            self.ck_and_raise_error(len(self.pres_res) <= 0, ERR_PRES_LOST_RUN_DATA, [len(self.pres_res)])
             # 3. Cal
             pres_tick, pres_data, pres_data_abs = [], [], []
 
@@ -1028,7 +1028,7 @@ class PRTouchEndstopWrapper:
             if err_cnt < 2:
                 self.print_msg('DEBUG', "check_bed_mesh: Pass!!")
                 return
-            self.ck_and_raise_error(not auto_g29, PR_ERR_CODE_CK_BED_MESH_OUT_RANGE, [[errs[0], errs[1],errs[2], errs[3]], self.check_bed_mesh_max_err])
+            self.ck_and_raise_error(not auto_g29, ERR_CK_BED_MESH_OUT_RANGE, [[errs[0], errs[1],errs[2], errs[3]], self.check_bed_mesh_max_err])
             self.print_msg('DEBUG', 'check_bed_mesh: Due to the great change of the hot bed or version, it needs to be re-leveled. ' + str([[errs[0], errs[1],errs[2], errs[3]], self.check_bed_mesh_max_err]))
             pass
         if self.use_adc:
@@ -1170,7 +1170,7 @@ class PRTouchEndstopWrapper:
                 self.tri_z_down_spd *= 0.40
                 self.best_above_z *= 2
                 self.shake_motor(self.shake_cnt)
-            self.ck_and_raise_error(i == 19, PR_ERR_CODE_G28_Z_DETECTION_TIMEOUT)
+            self.ck_and_raise_error(i == 19, ERR_G28_Z_DETECTION_TIMEOUT)
         if not accurate:
             return
         # 3. Normal probe z
@@ -1189,7 +1189,7 @@ class PRTouchEndstopWrapper:
             ck_z = self.run_step_prtouch(self.max_z * 1.2, self.probe_min_3err, False, 3, 3, True)
             if math.fabs(ck_z) > 1.0:
                 self.tri_z_down_spd *= 0.9
-                self.ck_and_raise_error(i == 2, PR_ERR_CODE_G28_Z_DETECTION_ERROR)
+                self.ck_and_raise_error(i == 2, ERR_G28_Z_DETECTION_ERROR)
                 continue
             break
         self.tri_z_down_spd = old_tri_z_spd
@@ -1307,7 +1307,7 @@ class PRTouchEndstopWrapper:
             res_z = self.run_step_prtouch(self.g29_down_min_z, self.probe_min_3err, True, 5, 3, True)
             self.print_msg('RUN_G29_Z', 'Step Lost Check, need=0, tri=%.2f' % res_z)
             if math.fabs(res_z) > self.lost_step_dis and self.lost_step_dis > 0:
-                self.ck_and_raise_error(not self.auto_reg29_after_lost_step, PR_ERR_CODE_HAVE_LOST_STEP)
+                self.ck_and_raise_error(not self.auto_reg29_after_lost_step, ERR_HAVE_LOST_STEP)
                 now_pos[2] = self.run_re_g29s(now_pos)
             self.bed_mesh_post_proc(now_pos)
             self.move(self.toolhead.get_position()[:2] + [10], self.rdy_z_spd)
@@ -1384,7 +1384,7 @@ class PRTouchEndstopWrapper:
         while (time.time() - t_last < (run_dis / run_spd + 5)) and (len(self.step_res) != MAX_BUF_LEN):
             self.delay_s(0.010)
         self.start_step_prtouch_cmd.send([self.step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
-        self.ck_and_raise_error(len(self.step_res) != MAX_BUF_LEN, PR_ERR_CODE_STEP_LOST_RUN_DATA, [len(self.step_res)])
+        self.ck_and_raise_error(len(self.step_res) != MAX_BUF_LEN, ERR_STEP_LOST_RUN_DATA, [len(self.step_res)])
         pass
 
     cmd_PRTOUCH_READY_help = "Test the ready point."
@@ -1482,7 +1482,7 @@ class PRTouchEndstopWrapper:
 
     cmd_TEST_PRTH_help = "For Debug Cmd"
     def cmd_TEST_PRTH(self, gcmd):
-        self.ck_and_raise_error(True, PR_ERR_CODE_G28_Z_DETECTION_TIMEOUT)
+        self.ck_and_raise_error(True, ERR_G28_Z_DETECTION_TIMEOUT)
         pass
 
 def load_config(config):

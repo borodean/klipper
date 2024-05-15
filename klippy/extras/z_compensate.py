@@ -7,8 +7,8 @@ import time
 import random
 
 
-PR_ERR_CODE_Z_OFFSET_CALIBRATION    = {'code':'key401', 'msg':'PR_ERR_CODE_Z_OFFSET_CALIBRATION: Ceramic pressure sensitive mistrigger..', 'values':[]}
-PR_ERR_CODE_SSAP_TEST_ERROR         = {'code':'key402', 'msg':'PR_ERR_CODE_SSAP_TEST_ERROR: Synchronization line communication is not available, please check the connection..', 'values':[]}
+ERR_Z_OFFSET_CALIBRATION    = 'Ceramic pressure sensitive mistrigger'
+ERR_SSAP_TEST_ERROR         = 'Synchronization line communication is not available, please check the connection'
 MAX_BUF_LEN = 32
 class ZCompensateInit:
     def __init__(self, config):
@@ -86,7 +86,7 @@ class ZCompensateInit:
         params1 = self.prtouch.read_swap_prtouch_cmd.send([self.prtouch.step_oid])
         if not params0 or not params1 or params0['sta'] != 0 or params1['sta'] != 1:
             self.print_msg('SWAP_TEST', '!!!Swap Test ERROR!!!', True)
-            self.ck_and_raise_error(True,PR_ERR_CODE_SSAP_TEST_ERROR)
+            self.ck_and_raise_error(True,ERR_SSAP_TEST_ERROR)
         else:
             self.print_msg('SWAP_TEST', '---Swap Test Success---', True)
         pass
@@ -97,7 +97,7 @@ class ZCompensateInit:
         if title != 'SHOW_WAVE':
             self.gcode.respond_info('[' + title + ']' + msg)
 
-    def ck_and_raise_error(self, ck, err_code, vals=[]):
+    def ck_and_raise_error(self, ck, err, vals=[]):
         if not ck:
             return
         self.prtouch.enable_steps()
@@ -111,11 +111,11 @@ class ZCompensateInit:
         self.toolhead.set_position(now_pos[:2] + [0, now_pos[3]], homing_axes=[2])
 
         self.prtouch.disable_steps()
-        err_code['values'] = vals
-        self.print_msg('RAISE_ERROR', str(err_code), True)
-        err_code['msg'] = 'Shutdown due to ' + err_code['msg']
-        self.printer.invoke_shutdown(str(err_code))
-        raise self.printer.command_error(str(err_code))
+        msg = err % tuple(vals)
+        self.print_msg('RAISE_ERROR', msg, True)
+        shutdown_msg = 'Shutdown due to ' + msg
+        self.printer.invoke_shutdown(shutdown_msg)
+        raise self.printer.command_error(shutdown_msg)
 
     def move(self, pos, speed, wait=True):
         if not self.shut_down:
@@ -256,7 +256,7 @@ class ZCompensateInit:
         if new_calibrate < 0:
             self.gcode.run_script_from_command('SET_GCODE_OFFSEt Z_ADJUST=%f MOVE=1' % (-self.z_offset_move))
             self.z_offset_move = 0
-            self.ck_and_raise_error(new_calibrate < 0,PR_ERR_CODE_Z_OFFSET_CALIBRATION)
+            self.ck_and_raise_error(new_calibrate < 0,ERR_Z_OFFSET_CALIBRATION)
 
         self.gcode.respond_info(
                 "%s: z_offset: %.3f\n"
