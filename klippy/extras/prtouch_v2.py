@@ -27,7 +27,6 @@ class PRTouchEndstopWrapper:
     def __init__(self, config):
         self.config = config
         self.printer = config.get_printer()
-        self.shut_down = False
         self.pres_tri_time, self.step_tri_time, self.pres_tri_chs, self.pres_buf_cnt = 0, 0, 0, 0
         self.mm_per_step = None
 
@@ -262,13 +261,11 @@ class PRTouchEndstopWrapper:
                 self._delay_s(0.5)
 
     def public_move(self, pos, speed, wait=True):
-
-        if not self.shut_down:
-            gcmd = 'G1 F%d X%.3f Y%.3f Z%.3f' % (speed * 60, pos[0], pos[1], pos[2]) if len(pos) >= 3 else 'G1 F%d X%.3f Y%.3f' % (speed * 60, pos[0], pos[1])
-            self._print_msg('PRTOUCH_MOVE', 'Start Move, gcmd=' + gcmd)
-            self.gcode.run_script_from_command(gcmd)
-            if wait:
-                self.toolhead.wait_moves()
+        gcmd = 'G1 F%d X%.3f Y%.3f Z%.3f' % (speed * 60, pos[0], pos[1], pos[2]) if len(pos) >= 3 else 'G1 F%d X%.3f Y%.3f' % (speed * 60, pos[0], pos[1])
+        self._print_msg('PRTOUCH_MOVE', 'Start Move, gcmd=' + gcmd)
+        self.gcode.run_script_from_command(gcmd)
+        if wait:
+            self.toolhead.wait_moves()
 
     def _ck_and_manual_get_step(self):
         if len(self.public_step_res) == MAX_BUF_LEN:
