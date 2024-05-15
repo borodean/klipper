@@ -4,10 +4,8 @@
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
 import os, sys, logging, io
-import json, time
 
 VALID_GCODE_EXTS = ['gcode', 'g', 'gco']
-LAYER_KEYS = [";LAYER:", "; layer:", "; LAYER:", ";AFTER_LAYER_CHANGE"]
 
 DEFAULT_ERROR_GCODE = """
 {% if 'heaters' in printer %}
@@ -36,10 +34,6 @@ class VirtualSD:
         gcode_macro = self.printer.load_object(config, 'gcode_macro')
         self.on_error_gcode = gcode_macro.load_template(
             config, 'on_error_gcode', DEFAULT_ERROR_GCODE)
-        if self.printer.start_args.get("apiserver")[-1] != "s":
-            self.index = self.printer.start_args.get("apiserver")[-1]
-        else:
-            self.index = "1"
         # Register commands
         self.gcode = self.printer.lookup_object('gcode')
         for cmd in ['M20', 'M21', 'M23', 'M24', 'M25', 'M26', 'M27']:
@@ -109,11 +103,7 @@ class VirtualSD:
         return None
     def progress(self):
         if self.file_size:
-            try:
-                return float(self.file_position) / self.file_size
-            except Exception as e:
-                logging.exception(e)
-                return 0.
+            return float(self.file_position) / self.file_size
         else:
             return 0.
     def is_active(self):
@@ -125,7 +115,6 @@ class VirtualSD:
                 self.reactor.pause(self.reactor.monotonic() + .001)
     def do_resume(self):
         if self.work_timer is not None:
-            logging.error("do_resume work_timer is not None")
             raise self.gcode.error("SD busy")
         self.must_pause_work = False
         self.work_timer = self.reactor.register_timer(
@@ -137,18 +126,6 @@ class VirtualSD:
             self.current_file = None
             self.print_stats.note_cancel()
         self.file_position = self.file_size = 0
-        from subprocess import call
-        mcu = self.printer.lookup_object('mcu', None)
-        pre_serial = mcu._serial.serial_dev.port.split("/")[-1]
-        path = "/mnt/UDISK/%s_gcode_coordinate.save" % pre_serial
-        print_file_name_save_path = "/mnt/UDISK/%s_print_file_name.save" % pre_serial
-        if os.path.exists(path):
-            os.remove(path)
-        if os.path.exists(print_file_name_save_path):
-            os.remove(print_file_name_save_path)
-        call("sync", shell=True)
-        gcode_move = self.printer.lookup_object('gcode_move')
-        toolhead = self.printer.lookup_object('toolhead')
     # G-Code commands
     def cmd_error(self, gcmd):
         raise gcmd.error("SD write not supported")
@@ -172,20 +149,11 @@ class VirtualSD:
     def cmd_SDCARD_PRINT_FILE(self, gcmd):
         if self.work_timer is not None:
             raise gcmd.error("SD busy")
-        # add load default bed_mesh
-        try:
-            logging.info("BED_MESH_PROFILE LOAD=default")
-            self.gcode.run_script_from_command("BED_MESH_PROFILE LOAD=default")
-        except Exception as e:
-            logging.info(e.__str__())
         self._reset_file()
         filename = gcmd.get("FILENAME")
         if filename[0] == '/':
             filename = filename[1:]
-        try:
-            os.system("rm /tmp/*.temp")
-        except:
-            pass
+        self._load_file(gcmd, filename, check_subdirs=True)
         self.do_resume()
     def cmd_M20(self, gcmd):
         # List SD card
@@ -202,12 +170,7 @@ class VirtualSD:
         if self.work_timer is not None:
             raise gcmd.error("SD busy")
         self._reset_file()
-        try:
-            filename = gcmd.get_raw_command_parameters().strip()
-            if filename.startswith(''):
-                filename = filename[1:]
-        except:
-            raise gcmd.error("Unable to extract filename")
+        filename = gcmd.get_raw_command_parameters().strip()
         if filename.startswith('/'):
             filename = filename[1:]
         self._load_file(gcmd, filename)
@@ -220,21 +183,19 @@ class VirtualSD:
             if fname not in flist:
                 fname = files_by_lower[fname.lower()]
             fname = os.path.join(self.sdcard_dirname, fname)
-            f = io.open(fname, 'r', newline='', encoding="utf-8")
+            f = io.open(fname, 'r', newline='')
             f.seek(0, os.SEEK_END)
             fsize = f.tell()
             f.seek(0)
-        except Exception as e:
-            logging.exception(e)
+        except:
+            logging.exception("virtual_sdcard file open")
             raise gcmd.error("Unable to open file")
         gcmd.respond_raw("File opened:%s Size:%d" % (filename, fsize))
         gcmd.respond_raw("File selected")
-        logging.error("File opened:%s Size:%d start_print" % (filename, fsize))
         self.current_file = f
         self.file_position = 0
         self.file_size = fsize
         self.print_stats.set_current_file(filename)
-        return fname
     def cmd_M24(self, gcmd):
         # Start/resume SD print
         self.do_resume()
@@ -262,12 +223,6 @@ class VirtualSD:
         return self.cmd_from_sd
     # Background work timer
     def work_handler(self, eventtime):
-        import time
-        # When the nozzle is moved
-        mcu = self.printer.lookup_object('mcu', None)
-        pre_serial = mcu._serial.serial_dev.port.split("/")[-1]
-        path = "/mnt/UDISK/%s_gcode_coordinate.save" % pre_serial
-        calc_layer_count = 0
         logging.info("Starting SD card print (position %d)", self.file_position)
         self.reactor.unregister_timer(self.work_timer)
         try:
@@ -281,9 +236,6 @@ class VirtualSD:
         partial_input = ""
         lines = []
         error_message = None
-        gcode_move = self.printer.lookup_object('gcode_move')
-        line_pos = 1
-        end_filename = self.file_path()
         while not self.must_pause_work:
             if not lines:
                 # Read more data
@@ -298,13 +250,6 @@ class VirtualSD:
                     self.current_file = None
                     logging.info("Finished SD card print")
                     self.gcode.respond_raw("Done printing file")
-                    if os.path.exists(path):
-                        os.remove(path)
-                    if os.path.exists(print_file_name_save_path):
-                        os.remove(print_file_name_save_path)
-                    toolhead = self.printer.lookup_object('toolhead')
-                    gcode = self.printer.lookup_object('gcode')
-                    time.sleep(0.2)
                     break
                 lines = data.split('\n')
                 lines[0] = partial_input + lines[0]
@@ -325,15 +270,6 @@ class VirtualSD:
                 next_file_position = self.file_position + len(line) + 1
             self.next_file_position = next_file_position
             try:
-                if calc_layer_count < 5:
-                    for layer_key in LAYER_KEYS:
-                        if ";LAYER_COUNT:" in layer_key:
-                            break
-                        if line.startswith(layer_key):
-                            calc_layer_count += 1
-                            break
-                    if calc_layer_count == 5:
-                        os.system("touch /tmp/layer_count_%s.temp" % self.index)
                 self.gcode.run_script(line)
             except self.gcode.error as e:
                 error_message = str(e)
@@ -358,12 +294,10 @@ class VirtualSD:
                 lines = []
                 partial_input = ""
         logging.info("Exiting SD card print (position %d)", self.file_position)
-        state = {}
         self.work_timer = None
         self.cmd_from_sd = False
         if error_message is not None:
             self.print_stats.note_error(error_message)
-            logging.error("file:" + str(end_filename) + ",error:" + error_message)
         elif self.current_file is not None:
             self.print_stats.note_pause()
         else:
