@@ -34,7 +34,7 @@ class PRTouchEndstopWrapper:
         self.public_step_res, self.pres_res = [], []
         self.public_read_swap_prtouch_cmd, self.public_start_step_prtouch_cmd = None, None
         self.public_write_swap_prtouch_cmd, self.start_pres_prtouch_cmd = None, None
-        self.bed_mesh, self.toolhead, self.bed_mesh = None, None, None
+        self.bed_mesh, self.toolhead = None, None
         # 0. Base Cfg
         self.use_adc            = config.getboolean('use_adc', default=False)
         # 1. Tri Cfg
