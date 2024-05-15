@@ -264,27 +264,6 @@ class VirtualSD:
         self.next_file_position = pos
     def is_cmd_from_sd(self):
         return self.cmd_from_sd
-    def tail_read(self, f):
-        cur_pos = f.tell()
-        buf = ''
-        while True:
-            try:
-                b = str(f.read(1))
-            except UnicodeDecodeError as err:
-                logging.error("UnicodeDecodeError err:%s" % str(err))
-                cur_pos -= 1
-                if cur_pos < 0: break
-                f.seek(cur_pos)
-                continue
-            buf = b + buf
-            cur_pos -= 1
-            if cur_pos < 0: break
-            f.seek(cur_pos)
-            if b.startswith("\n") or b.startswith("\r"):
-                buf = '\n'
-            if (buf.startswith("G1") or buf.startswith("G0") or buf.startswith(";")) and buf.endswith("\n"):
-                break
-        return buf
     # Background work timer
     def work_handler(self, eventtime):
         import time
