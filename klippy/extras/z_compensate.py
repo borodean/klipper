@@ -74,7 +74,6 @@ class ZCompensateInit:
         if not self.printer.is_shutdown():
             self.toolhead.get_last_move_time()
             eventtime = reactor.pause(eventtime + delay_s)
-            pass
     def TEST_SWAP(self):
         self.toolhead   = self.printer.lookup_object("toolhead")
         self.prtouch.write_swap_prtouch_cmd.send([self.prtouch.pres_oid, 0])
@@ -87,7 +86,6 @@ class ZCompensateInit:
             self.ck_and_raise_error(True,ERR_SSAP_TEST_ERROR)
         else:
             self.print_msg('SWAP_TEST', '---Swap Test Success---', True)
-        pass
 
     def print_msg(self, title, msg, force=False):
         if not force:
@@ -120,20 +118,17 @@ class ZCompensateInit:
             self.gcode.run_script_from_command('G1 F%d X%.3f Y%.3f Z%.3f' % (speed * 60, pos[0], pos[1], pos[2]) if len(pos) >= 3 else 'G1 F%d X%.3f Y%.3f' % (speed * 60, pos[0], pos[1]))
             if wait:
                 self.toolhead.wait_moves()
-            pass
     def set_hot_temps(self, temp, wait=False, err=5):
         self.pheaters.set_temperature(self.heater_hot, temp, False)
         if wait:
             while not self.shut_down and abs(self.heater_hot.target_temp - self.heater_hot.smoothed_temp) > err and self.heater_hot.target_temp > 0:
                 self.delay_s(0.100)
-        pass
 
     def set_bed_temps(self, temp, wait=False, err=5):
         self.pheaters.set_temperature(self.heater_bed, temp, False)
         if wait:
             while not self.shut_down and abs(self.heater_bed.target_temp - self.heater_bed.smoothed_temp) > err and self.heater_bed.target_temp > 0:
                 self.delay_s(0.100)
-        pass
     def set_step_par(self, load_sys=True):
         if load_sys:
             self.toolhead.max_velocity = self.sys_max_velocity
@@ -150,7 +145,6 @@ class ZCompensateInit:
         self.toolhead.max_accel = self.run_max_accel
         self.toolhead.kin.max_z_velocity = self.run_max_z_velocity
         self.toolhead.kin.max_z_accel = self.run_max_z_accel
-        pass
     def cr10se_clear_nozzle(self, hot_start_temp, hot_rub_temp, hot_end_temp, bed_add_temp):
         min_x, min_y = self.clr_noz_start_x, self.clr_noz_start_y
         if self.type_nozz == 1 :
@@ -189,7 +183,6 @@ class ZCompensateInit:
         self.set_step_par(load_sys=True)
         self.bed_mesh.set_mesh(mesh)
         self.gcode.run_script_from_command('G28 Z')
-        pass
 
     cmd_CR10SE_NOZZLE_CLEAR_help = "Clear the nozzle on bed."
     def cmd_CR10SE_NOZZLE_CLEAR(self, gcmd):
@@ -265,7 +258,6 @@ class ZCompensateInit:
         configfile.set(self.printer.lookup_object('probe').name, 'z_offset', "%.3f" % (new_calibrate,))
         #写入调平数据
         self.bed_mesh.set_mesh(mesh)
-        pass
 
     cmd_Z_OFFSET_AUTO_help = "Z offset auto"
     def cmd_Z_OFFSET_AUTO(self, gcmd):   # PRTOUCH_TEST X=20 Y=20 Z=-4 S=0.0125
@@ -275,7 +267,6 @@ class ZCompensateInit:
         self.cmd_CR10SE_NOZZLE_CLEAR(gcmd)
         self.cmd_Z_OFFSET_CALIBRATION(gcmd)
         self.printer.lookup_object('configfile').cmd_SAVE_CONFIG(gcmd)
-        pass
 
 def load_config(config):
 
