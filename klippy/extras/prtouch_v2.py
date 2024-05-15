@@ -14,7 +14,6 @@ PR_VERSION = 307
 
 # COMMANDS
 
-# TEST_SWAP
 # DEAL_AVGS
 # TRIG_TEST C=10
 # SELF_CHECK_PRTOUCH
@@ -154,7 +153,6 @@ class PRTouchEndstopWrapper:
         self.step_mcu.register_config_callback(self._build_step_config)
         self.pres_mcu.register_config_callback(self._build_pres_config)
 
-        self.gcode.register_command('TEST_SWAP', self.cmd_TEST_SWAP, desc=self.cmd_TEST_SWAP_help)
         self.gcode.register_command('DEAL_AVGS', self.cmd_DEAL_AVGS, desc=self.cmd_DEAL_AVGS_help)
         self.gcode.register_command('TRIG_TEST', self.cmd_TRIG_TEST, desc=self.cmd_TRIG_TEST_help)
         self.gcode.register_command('CHECK_BED_MESH', self.cmd_CHECK_BED_MESH, desc=self.cmd_CHECK_BED_MESH_help)
@@ -936,20 +934,6 @@ class PRTouchEndstopWrapper:
             self._set_fan_speed('heater_fan', self.fan_heat_max_spd)
         self._set_step_par(load_sys=True)
         self.bed_mesh.set_mesh(mesh)
-
-    cmd_TEST_SWAP_help = "Test The Swap Pin."
-    def cmd_TEST_SWAP(self, gcmd):
-        del gcmd
-
-        self.public_write_swap_prtouch_cmd.send([self.public_pres_oid, 0])
-        params0 = self.public_read_swap_prtouch_cmd.send([self.public_step_oid])
-
-        self.public_write_swap_prtouch_cmd.send([self.public_pres_oid, 1])
-        params1 = self.public_read_swap_prtouch_cmd.send([self.public_step_oid])
-        if not params0 or not params1 or params0['sta'] != 0 or params1['sta'] != 1:
-            self._print_msg('SWAP_TEST', '!!!Swap Test ERROR!!!', True)
-        else:
-            self._print_msg('SWAP_TEST', '---Swap Test Success---', True)
 
     cmd_DEAL_AVGS_help = "Read And Cal The Avgs."
     def cmd_DEAL_AVGS(self, gcmd):
