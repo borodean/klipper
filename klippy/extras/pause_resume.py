@@ -143,7 +143,6 @@ class PauseResume:
         else:
             gcmd.respond_info("action:cancel")
         self.cmd_CLEAR_PAUSE(gcmd)
-        self.v_sd.pause_flag = 1
 
 def load_config(config):
     return PauseResume(config)
