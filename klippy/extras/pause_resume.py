@@ -72,21 +72,6 @@ class PauseResume:
         self.send_pause_command()
         self.gcode.run_script_from_command("SAVE_GCODE_STATE NAME=PAUSE_STATE")
         self.is_paused = True
-        mcu = self.printer.lookup_object('mcu', None)
-        pre_serial = mcu._serial.serial_dev.port.split("/")[-1]
-        print_file_name_save_path = "/mnt/UDISK/%s_print_file_name.save" % pre_serial
-        if os.path.exists(print_file_name_save_path):
-            try:
-                import json
-                result = {}
-                with open(print_file_name_save_path, "r") as f:
-                    result = json.loads(f.read())
-                    result["z_pause"] = 2
-                with open(print_file_name_save_path, "w") as f:
-                    f.write(json.dumps(result))
-                    f.flush()
-            except Exception as err:
-                pass
     def send_resume_command(self):
         if self.sd_paused:
             # Printing from virtual sd, run pause command
