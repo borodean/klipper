@@ -56,7 +56,6 @@ class VirtualSD:
         self.count_G1 = 0
         self.count_line = 0
         self.toolhead_moved = False
-        self.print_id = ""
     def handle_shutdown(self):
         if self.work_timer is not None:
             self.must_pause_work = True
@@ -157,8 +156,6 @@ class VirtualSD:
         if toolhead and gcode_move and gcode_move.is_delta and gcode_move.is_power_loss:
             gcode_move.is_power_loss = False
             gcode_move.homing_position = gcode_move.homing_position_bak
-        if self.print_id:
-            self.print_id = ""
     # G-Code commands
     def cmd_error(self, gcmd):
         raise gcmd.error("SD write not supported")
@@ -180,7 +177,6 @@ class VirtualSD:
     cmd_SDCARD_PRINT_FILE_help = "Loads a SD file and starts the print.  May "\
         "include files in subdirectories."
     def cmd_SDCARD_PRINT_FILE(self, gcmd):
-        self.print_id = ""
         if self.work_timer is not None:
             raise gcmd.error("SD busy")
         # add load default bed_mesh
@@ -379,7 +375,6 @@ class VirtualSD:
                         gcode_move.is_power_loss = False
                         gcode_move.homing_position = gcode_move.homing_position_bak
                     time.sleep(0.2)
-                    self.print_id = ""
                     break
                 lines = data.split('\n')
                 lines[0] = partial_input + lines[0]
