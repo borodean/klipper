@@ -25,7 +25,6 @@ class ZCompensateInit:
 
         self.gcode.register_command('Z_OFFSET_CALIBRATION', self.cmd_Z_OFFSET_CALIBRATION, desc=self.cmd_Z_OFFSET_CALIBRATION_help)
         self.gcode.register_command('Z_OFFSET_AUTO', self.cmd_Z_OFFSET_AUTO, desc=self.cmd_Z_OFFSET_AUTO_help)
-        self.gcode.register_command('CRTENSE_NOZZLE_CLEAR', self.cmd_CR10SE_NOZZLE_CLEAR, desc=self.cmd_CR10SE_NOZZLE_CLEAR_help)
 
         self.vs_start_z_pos     = config.getfloat('vs_start_z_pos', default=3, minval=0, maxval=10)
         self.bl_offset = [0,0]
@@ -184,8 +183,7 @@ class ZCompensateInit:
         self.bed_mesh.set_mesh(mesh)
         self.gcode.run_script_from_command('G28 Z')
 
-    cmd_CR10SE_NOZZLE_CLEAR_help = "Clear the nozzle on bed."
-    def cmd_CR10SE_NOZZLE_CLEAR(self, gcmd):
+    def _cr10se_nozzle_clear(self, gcmd):
         self._TEST_SWAP()
         self.gcode.run_script_from_command('SET_GCODE_OFFSEt Z_ADJUST=%f MOVE=1' %(0 - self.z_offset_move))
         self.z_offset_move = 0
@@ -264,7 +262,7 @@ class ZCompensateInit:
         self._TEST_SWAP()
         self.gcode.run_script_from_command('SET_GCODE_OFFSEt Z_ADJUST=%f MOVE=1' %(0 - self.z_offset_move))
         self.z_offset_move = 0
-        self.cmd_CR10SE_NOZZLE_CLEAR(gcmd)
+        self._cr10se_nozzle_clear(gcmd)
         self.cmd_Z_OFFSET_CALIBRATION(gcmd)
         self.printer.lookup_object('configfile').cmd_SAVE_CONFIG(gcmd)
 
