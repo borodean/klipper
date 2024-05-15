@@ -150,9 +150,6 @@ class VirtualSD:
         call("sync", shell=True)
         gcode_move = self.printer.lookup_object('gcode_move')
         toolhead = self.printer.lookup_object('toolhead')
-        if toolhead and gcode_move and gcode_move.is_delta and gcode_move.is_power_loss:
-            gcode_move.is_power_loss = False
-            gcode_move.homing_position = gcode_move.homing_position_bak
     # G-Code commands
     def cmd_error(self, gcmd):
         raise gcmd.error("SD write not supported")
@@ -308,9 +305,6 @@ class VirtualSD:
                         os.remove(print_file_name_save_path)
                     toolhead = self.printer.lookup_object('toolhead')
                     gcode = self.printer.lookup_object('gcode')
-                    if gcode and toolhead and gcode_move and gcode_move.is_delta and gcode_move.is_power_loss:
-                        gcode_move.is_power_loss = False
-                        gcode_move.homing_position = gcode_move.homing_position_bak
                     time.sleep(0.2)
                     break
                 lines = data.split('\n')

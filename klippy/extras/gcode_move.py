@@ -44,7 +44,6 @@ class GCodeMove:
         self.base_position = [0.0, 0.0, 0.0, 0.0]
         self.last_position = [0.0, 0.0, 0.0, 0.0]
         self.homing_position = [0.0, 0.0, 0.0, 0.0]
-        self.homing_position_bak = [0.0, 0.0, 0.0, 0.0]
         self.speed = 25.
         self.speed_factor = 1. / 60.
         self.extrude_factor = 1.
@@ -53,7 +52,6 @@ class GCodeMove:
         self.move_transform = self.move_with_transform = None
         self.position_with_transform = (lambda: [0., 0., 0., 0.])
         self.is_delta = False
-        self.is_power_loss = False
         try:
             self.printer_config = config.getsection('printer')
             if self.printer_config and self.printer_config.get("kinematics") == "delta":
