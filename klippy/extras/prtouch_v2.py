@@ -156,7 +156,6 @@ class PRTouchEndstopWrapper:
         self.step_mcu.register_config_callback(self._build_step_config)
         self.pres_mcu.register_config_callback(self._build_pres_config)
 
-        self.gcode.register_command('TEST_PRTH', self.cmd_TEST_PRTH, desc=self.cmd_TEST_PRTH_help)
         self.gcode.register_command('READ_PRES', self.cmd_READ_PRES, desc=self.cmd_READ_PRES_help)
         self.gcode.register_command('TEST_SWAP', self.cmd_TEST_SWAP, desc=self.cmd_TEST_SWAP_help)
         self.gcode.register_command('DEAL_AVGS', self.cmd_DEAL_AVGS, desc=self.cmd_DEAL_AVGS_help)
@@ -1109,12 +1108,6 @@ class PRTouchEndstopWrapper:
         del gcmd
 
         self._env_self_check(force=True)
-
-    cmd_TEST_PRTH_help = "For Debug Cmd"
-    def cmd_TEST_PRTH(self, gcmd):
-        del gcmd
-
-        self._ck_and_raise_error(True, ERR_G28_Z_DETECTION_TIMEOUT)
 
 def load_config(config):
     vrt = PRTouchEndstopWrapper(config)
