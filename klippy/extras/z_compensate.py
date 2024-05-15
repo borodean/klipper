@@ -75,11 +75,11 @@ class ZCompensateInit:
             eventtime = reactor.pause(eventtime + delay_s)
     def _TEST_SWAP(self):
         self.toolhead   = self.printer.lookup_object("toolhead")
-        self.prtouch.public_write_swap_prtouch_cmd.send([self.prtouch.public_pres_oid, 0])
-        params0 = self.prtouch.public_read_swap_prtouch_cmd.send([self.prtouch.public_step_oid])
+        self.prtouch.write_swap_prtouch_cmd.send([self.prtouch.pres_oid, 0])
+        params0 = self.prtouch.read_swap_prtouch_cmd.send([self.prtouch.step_oid])
 
-        self.prtouch.public_write_swap_prtouch_cmd.send([self.prtouch.public_pres_oid, 1])
-        params1 = self.prtouch.public_read_swap_prtouch_cmd.send([self.prtouch.public_step_oid])
+        self.prtouch.write_swap_prtouch_cmd.send([self.prtouch.pres_oid, 1])
+        params1 = self.prtouch.read_swap_prtouch_cmd.send([self.prtouch.step_oid])
         if not params0 or not params1 or params0['sta'] != 0 or params1['sta'] != 1:
             self._print_msg('SWAP_TEST', '!!!Swap Test ERROR!!!', True)
             self._ck_and_raise_error(True,ERR_SSAP_TEST_ERROR)
@@ -95,17 +95,17 @@ class ZCompensateInit:
     def _ck_and_raise_error(self, ck, err, vals=[]):
         if not ck:
             return
-        self.prtouch.public_enable_steps()
+        self.prtouch.enable_steps()
         now_pos = self.toolhead.get_position()
-        step_cnt, step_us, acc_ctl_cnt = self.prtouch.public_get_step_cnts(self.g29_down_min_z, self.tri_z_down_spd)
-        self.prtouch.public_start_step_prtouch_cmd.send([self.prtouch.public_step_oid, 1, self.prtouch.public_tri_send_ms, step_cnt, step_us, acc_ctl_cnt, self.low_spd_nul, self.send_step_duty, 0])
+        step_cnt, step_us, acc_ctl_cnt = self.prtouch.get_step_cnts(self.g29_down_min_z, self.tri_z_down_spd)
+        self.prtouch.start_step_prtouch_cmd.send([self.prtouch.step_oid, 1, self.prtouch.tri_send_ms, step_cnt, step_us, acc_ctl_cnt, self.low_spd_nul, self.send_step_duty, 0])
         t_last = time.time()
-        while (time.time() - t_last < 20) and (len(self.prtouch.public_step_res) != MAX_BUF_LEN):
+        while (time.time() - t_last < 20) and (len(self.prtouch.step_res) != MAX_BUF_LEN):
             self._delay_s(0.010)
-        self.prtouch.public_start_step_prtouch_cmd.send([self.prtouch.public_step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
+        self.prtouch.start_step_prtouch_cmd.send([self.prtouch.step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
         self.toolhead.set_position(now_pos[:2] + [0, now_pos[3]], homing_axes=[2])
 
-        self.prtouch.public_disable_steps()
+        self.prtouch.disable_steps()
         msg = err % tuple(vals)
         self._print_msg('RAISE_ERROR', msg, True)
         shutdown_msg = 'Shutdown due to ' + msg
@@ -161,9 +161,9 @@ class ZCompensateInit:
 
         self._set_hot_temps(temp=hot_start_temp, wait=True, err=10)
         self._move([src_pos[0], src_pos[1], src_pos[2]], self.rdy_xy_spd)
-        src_pos[2] = self.prtouch.public_run_step_prtouch(self.g29_down_min_z, 0, False, self.pr_clear_probe_cnt, self.pr_clear_probe_cnt, True, self.tri_min_hold, self.tri_max_hold)
+        src_pos[2] = self.prtouch.run_step_prtouch(self.g29_down_min_z, 0, False, self.pr_clear_probe_cnt, self.pr_clear_probe_cnt, True, self.tri_min_hold, self.tri_max_hold)
         self._move([end_pos[0], end_pos[1], end_pos[2]], self.rdy_xy_spd)
-        end_pos[2] = self.prtouch.public_run_step_prtouch(self.g29_down_min_z, 0, False, self.pr_clear_probe_cnt, self.pr_clear_probe_cnt, True, self.tri_min_hold, self.tri_max_hold)
+        end_pos[2] = self.prtouch.run_step_prtouch(self.g29_down_min_z, 0, False, self.pr_clear_probe_cnt, self.pr_clear_probe_cnt, True, self.tri_min_hold, self.tri_max_hold)
         self._move([src_pos[0], src_pos[1], self.bed_max_err], self.rdy_xy_spd)
         self._move([src_pos[0], src_pos[1] + 5, src_pos[2] - self.pa_clr_down_mm], self.rdy_z_spd)# Move to the nozzle wipe starting point
         self._set_hot_temps(temp=hot_rub_temp, wait=True, err=10) # Wait for heating
@@ -225,9 +225,9 @@ class ZCompensateInit:
             self._move([pr_pos[i][0] - self.bl_offset[0], pr_pos[i][1] - self.bl_offset[1]] + [8, now_pos[3]], 100)
             bl_data[i] = self.printer.lookup_object('probe').run_probe(gcmd)
 
-            self.prtouch.public_move([pr_pos[i][0], pr_pos[i][1]] + [self.vs_start_z_pos, now_pos[3]], 100)
-            self.prtouch.public_get_mm_per_step()
-            pr_data[i]= self.prtouch.public_run_step_prtouch(self.g29_down_min_z, 0, False, self.pr_probe_cnt, self.pr_probe_cnt, True)
+            self.prtouch.move([pr_pos[i][0], pr_pos[i][1]] + [self.vs_start_z_pos, now_pos[3]], 100)
+            self.prtouch.get_mm_per_step()
+            pr_data[i]= self.prtouch.run_step_prtouch(self.g29_down_min_z, 0, False, self.pr_probe_cnt, self.pr_probe_cnt, True)
             z_offset[i] =  bl_data[i][2]  - pr_data[i]
 
         z_offset_old = self.printer.lookup_object('probe').z_offset
