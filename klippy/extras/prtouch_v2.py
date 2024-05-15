@@ -49,7 +49,6 @@ class PRTouchEndstopWrapper:
     def __init__(self, config):
         self.config = config
         self.printer = config.get_printer()
-        self.steppers = []
         self.shut_down = False
         self.jump_probe_ready, self.has_save_sys_acc = False, False
         self.safe_move_z_tri_call_back, self.safe_move_z_all_cnt = None, 0
@@ -59,7 +58,7 @@ class PRTouchEndstopWrapper:
         self.ver_step, self.ver_pres, self.ver_prth = 'V0.0', 'V0.0', ('V' + str(PR_VERSION / 100))
         self.sys_max_velocity, self.sys_max_accel, self.sys_max_z_velocity, self.sys_max_z_accel = 0, 0, 0, 0
 
-        self.step_res, self.pres_res, self.steppers = [], [], []
+        self.step_res, self.pres_res = [], []
         self.read_swap_prtouch_cmd, self.start_step_prtouch_cmd = None, None
         self.write_swap_prtouch_cmd, self.read_pres_prtouch_cmd, self.start_pres_prtouch_cmd = None, None, None
         self.bed_mesh, self.toolhead, self.bed_mesh, self.pheaters, self.heater_hot, self.heater_bed = None, None, None, None, None, None
@@ -266,9 +265,6 @@ class PRTouchEndstopWrapper:
 
     def _handle_result_read_pres_prtouch(self, params):
         self.pres_res.append(params)
-
-    def get_steppers(self):
-        return list(self.steppers)
 
     def print_msg(self, title, msg, force=False):
         logging.info('[%s] %s' , title, msg)
