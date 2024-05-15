@@ -95,7 +95,6 @@ class PauseResume:
     def send_resume_command(self):
         if self.sd_paused:
             # Printing from virtual sd, run pause command
-            self.v_sd.do_resume_status = True
             self.v_sd.do_resume()
             self.sd_paused = False
         else:

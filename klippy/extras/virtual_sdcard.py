@@ -55,7 +55,6 @@ class VirtualSD:
         self.count = 0
         self.count_G1 = 0
         self.count_line = 0
-        self.do_resume_status = False
         self.do_cancel_status = False
         self.power_loss_pause_flag = False
         self.pause_flag = 1  # 1 Pause during printing, 2 Suspension of preheating process after power failure
@@ -457,7 +456,6 @@ class VirtualSD:
         self.count_G1 = 0
         self.count_line = 0
         state = {}
-        self.do_resume_status = False
         self.do_cancel_status = False
         self.work_timer = None
         self.cmd_from_sd = False
