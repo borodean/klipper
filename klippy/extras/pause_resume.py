@@ -38,9 +38,7 @@ class PauseResume:
     def _handle_cancel_request(self, web_request):
         self.gcode.run_script("CANCEL_PRINT")
     def _handle_pause_request(self, web_request):
-        self.v_sd.power_loss_pause_flag = True
         self.gcode.run_script("PAUSE")
-        self.v_sd.power_loss_pause_flag = False
     def _handle_resume_request(self, web_request):
         self.gcode.run_script("RESUME")
     def get_status(self, eventtime):
