@@ -57,7 +57,6 @@ class VirtualSD:
         self.count_line = 0
         self.toolhead_moved = False
         self.print_id = ""
-        self.cur_print_data = {}
     def handle_shutdown(self):
         if self.work_timer is not None:
             self.must_pause_work = True
@@ -158,9 +157,8 @@ class VirtualSD:
         if toolhead and gcode_move and gcode_move.is_delta and gcode_move.is_power_loss:
             gcode_move.is_power_loss = False
             gcode_move.homing_position = gcode_move.homing_position_bak
-        if self.print_id and self.cur_print_data:
+        if self.print_id:
             self.print_id = ""
-            self.cur_print_data = {}
     # G-Code commands
     def cmd_error(self, gcmd):
         raise gcmd.error("SD write not supported")
@@ -381,7 +379,6 @@ class VirtualSD:
                         gcode_move.is_power_loss = False
                         gcode_move.homing_position = gcode_move.homing_position_bak
                     time.sleep(0.2)
-                    self.cur_print_data = {}
                     self.print_id = ""
                     break
                 lines = data.split('\n')
