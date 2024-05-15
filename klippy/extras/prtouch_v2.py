@@ -9,15 +9,11 @@ import math
 import random
 
 
-PR_VERSION = 307
-
-
 # COMMANDS
 
 # SELF_CHECK_PRTOUCH
 # START_STEP_PRTOUCH DIR=1 SPD=10 DIS=10
 # NOZZLE_CLEAR HOT_MIN_TEMP=140 HOT_MAX_TEMP=260 BED_MAX_TEMP=100
-# CHECK_BED_MESH AUTO_G29=1
 # PRTOUCH_READY
 # FORCE_MOVE STEPPER=stepper_x DISTANCE=5 VELOCITY=10
 # PID_CALIBRATE HEATER=extruder TARGET=210
@@ -34,7 +30,6 @@ ERR_STEP_LOST_RUN_DATA      = 'The motor step data is lost when the probe is ove
 ERR_G28_Z_DETECTION_TIMEOUT = 'G28 Z try probe out of times'
 ERR_G28_Z_DETECTION_ERROR   = 'G28 Z probe ERROR'
 ERR_SWAP_PIN_DETECTI        = 'The synchronization pin test failed, pres_swap_pin=%s, step_swap_pin=%s'
-ERR_CK_BED_MESH_OUT_RANGE   = 'A hot bed tilting procedure that differs too much from bed_mesh data'
 
 MAX_PRES_CNT = 4
 MAX_BUF_LEN = 32
@@ -49,7 +44,7 @@ class PRTouchEndstopWrapper:
         self.jump_probe_ready, self.has_save_sys_acc = False, False
         self.safe_move_z_tri_call_back, self.safe_move_z_all_cnt = None, 0
         self.mm_per_step, self.pres_tri_time, self.step_tri_time, self.pres_tri_chs, self.pres_buf_cnt = 0, 0, 0, 0, 0
-        self.rdy_pos, self.gap_pos = None, None
+        self.rdy_pos = None
         self.mm_per_step = None
         self.sys_max_velocity, self.sys_max_accel, self.sys_max_z_velocity, self.sys_max_z_accel = 0, 0, 0, 0
 
@@ -97,8 +92,6 @@ class PRTouchEndstopWrapper:
         self.run_max_z_velocity = config.getfloat('run_max_z_velocity', default=20, minval=1, maxval=5000)
         self.run_max_z_accel    = config.getfloat('run_max_z_accel', default=200, minval=1, maxval=50000)
         # 6. Gap Cfg
-        self.need_measure_gap   = config.getboolean('need_measure_gap', default=False)
-        self.check_bed_mesh_max_err = config.getfloat('check_bed_mesh_max_err', default=0.2, minval=0.01, maxval=1)
         self.stored_profs       = config.get_prefix_sections('prtouch')
         self.stored_profs       = self.stored_profs[1] if len(self.stored_profs) == 2 else None
         # 6. Other Cfg
@@ -116,9 +109,7 @@ class PRTouchEndstopWrapper:
         self.fan_heat_max_spd   = config.getfloat('fan_heat_max_spd', default=1.0, minval=0, maxval=255)
 
         self.gcode              = self.printer.lookup_object('gcode')
-        self.tilt_corr_dis      = config.getfloat('tilt_corr_dis', default=0, minval=-0.1, maxval=0.1)
 
-        self.noz_ex_com         = config.getfloat('noz_ex_com', default=0.0, minval=0, maxval=1)    # Nozzle expansion compensation
         self.sys_time_duty      = config.getfloat('sys_time_duty', default=0.001, minval=0.00001, maxval=0.010)
         self.is_corexz          = str(config.getsection('printer').get('kinematics')) == 'corexz'
         # 1. Load Swap Pins
@@ -151,7 +142,6 @@ class PRTouchEndstopWrapper:
         self.step_mcu.register_config_callback(self._build_step_config)
         self.pres_mcu.register_config_callback(self._build_pres_config)
 
-        self.gcode.register_command('CHECK_BED_MESH', self.cmd_CHECK_BED_MESH, desc=self.cmd_CHECK_BED_MESH_help)
         self.gcode.register_command('PRTOUCH_READY', self.cmd_PRTOUCH_READY, desc=self.cmd_PRTOUCH_READY_help)
         self.gcode.register_command('NOZZLE_CLEAR', self.cmd_NOZZLE_CLEAR, desc=self.cmd_NOZZLE_CLEAR_help)
         self.gcode.register_command('SAFE_DOWN_Z', self.cmd_SAFE_DOWN_Z, desc=self.cmd_SAFE_DOWN_Z_help)
@@ -183,10 +173,6 @@ class PRTouchEndstopWrapper:
         random.seed(time.time())
         self.rdy_pos = [[min_x, min_y, self.bed_max_err], [min_x, max_y, self.bed_max_err],
                         [max_x, max_y, self.bed_max_err], [max_x, min_y, self.bed_max_err]]
-        self.gap_pos = [[min_x, min_y, 0 if (not self.stored_profs or not self.need_measure_gap) else self.stored_profs.getfloat('z_gap_00', default=0, minval=0, maxval=1)],
-                        [min_x, max_y, 0 if (not self.stored_profs or not self.need_measure_gap) else self.stored_profs.getfloat('z_gap_01', default=0, minval=0, maxval=1)],
-                        [max_x, max_y, 0 if (not self.stored_profs or not self.need_measure_gap) else self.stored_profs.getfloat('z_gap_11', default=0, minval=0, maxval=1)],
-                        [max_x, min_y, 0 if (not self.stored_profs or not self.need_measure_gap) else self.stored_profs.getfloat('z_gap_10', default=0, minval=0, maxval=1)]]
 
         self.step_mcu.add_config_cmd('config_step_prtouch oid=%d step_cnt=%d swap_pin=%s sys_time_duty=%u'
                                      % (self.public_step_oid, len(self.z_step_pins), self.ppins.parse_pin(self.step_swap_pin, True, True)['pin'], int(self.sys_time_duty * 100000)))
@@ -732,46 +718,6 @@ class PRTouchEndstopWrapper:
         self._print_ary('RES_Z', res_z, len(res_z))
         return res_z[int((len(res_z) - 1) / 2)] if len(res_z) != 2 else (res_z[0] + res_z[1]) / 2
 
-    def _check_bed_mesh(self, auto_g29=True):
-        self._print_msg('CK_BED_MESH', 'Start check_bed_mesh()...')
-        self._ck_g28ed()
-        _, min_y = self.bed_mesh.bmc.mesh_min
-        _, max_y = self.bed_mesh.bmc.mesh_max
-        mesh = self.bed_mesh.get_mesh()
-        self.bed_mesh.set_mesh(None)
-        self._print_msg('CK_BED_MESH', 'Start probe_ready()...')
-        self._probe_ready()
-        self.jump_probe_ready = True
-        if self.use_adc:
-            self._set_fan_speed('heater_fan', self.fan_heat_min_spd)
-        self._set_fan_speed('fan', 0.0)
-        if mesh:
-            self.bed_mesh.set_mesh(mesh)
-            err_cnt, errs = 0, []
-
-            for i in range(4):
-                mesh_z = self.bed_mesh.z_mesh.calc_z(self.rdy_pos[i][0], self.rdy_pos[i][1]) - self.noz_ex_com - ((1 - (self.rdy_pos[i][1] - min_y) / (max_y - min_y)) * (2 * self.tilt_corr_dis) - self.tilt_corr_dis)
-                errs.append(abs(self.rdy_pos[i][2] + self.gap_pos[i][2] - mesh_z))
-                err_cnt += (1 if errs[i] > self.check_bed_mesh_max_err else 0)
-                self._print_msg('CK_BED_MESH', 'P%d = [x=%.2f, y=%.2f, mest_z=%.2f, probe_z=%.2f, err_z=%.2f]' % (i, self.rdy_pos[i][0], self.rdy_pos[i][1], mesh_z, self.rdy_pos[i][2], errs[i]))
-
-            save_version = 0 if not self.stored_profs else self.stored_profs.getint('version', default=0)
-            self._print_msg('CK_BED_MESH', 'Now Version=%d, Cfg Version=%d' % (PR_VERSION, save_version))
-            err_cnt = err_cnt if save_version == PR_VERSION else 4
-            if err_cnt < 2:
-                self._print_msg('DEBUG', "check_bed_mesh: Pass!!")
-                return
-            self._ck_and_raise_error(not auto_g29, ERR_CK_BED_MESH_OUT_RANGE, [[errs[0], errs[1],errs[2], errs[3]], self.check_bed_mesh_max_err])
-            self._print_msg('DEBUG', 'check_bed_mesh: Due to the great change of the hot bed or version, it needs to be re-leveled. ' + str([[errs[0], errs[1],errs[2], errs[3]], self.check_bed_mesh_max_err]))
-        if self.use_adc:
-            self._set_fan_speed('heater_fan', self.fan_heat_max_spd)
-        self.gcode.run_script_from_command('BED_MESH_CALIBRATE')
-
-        configfile = self.printer.lookup_object('configfile')
-        configfile.set('prtouch default', 'version', PR_VERSION)
-
-        self.gcode.run_script_from_command('SAVE_CONFIG')
-
     def _clear_nozzle(self, hot_min_temp, hot_max_temp, bed_max_temp):
         self._print_msg('CLEAR_NOZZLE', 'Start clear_nozzle(), hot_min_temp=%.2f, hot_max_temp=%.2f, bed_max_temp=%.2f' % (hot_min_temp, hot_max_temp, bed_max_temp))
         min_x, min_y = self.clr_noz_start_x, self.clr_noz_start_y
@@ -937,10 +883,6 @@ class PRTouchEndstopWrapper:
         hot_max_temp = gcmd.get_float('HOT_MAX_TEMP', self.hot_max_temp)
         bed_max_temp = gcmd.get_float('BED_MAX_TEMP', self.bed_max_temp)
         self._clear_nozzle(hot_min_temp, hot_max_temp, bed_max_temp)
-
-    cmd_CHECK_BED_MESH_help = "Check the bed mesh."
-    def cmd_CHECK_BED_MESH(self, gcmd):
-        self._check_bed_mesh(gcmd.get_int('AUTO_G29', 0) > 0)
 
     cmd_START_STEP_PRTOUCH_help = "Start the step prtouch."
     def cmd_START_STEP_PRTOUCH(self, gcmd):
