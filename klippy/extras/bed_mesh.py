@@ -330,17 +330,6 @@ class BedMeshCalibrate:
         self.gcode.register_command(
             'BED_MESH_CALIBRATE', self.cmd_BED_MESH_CALIBRATE,
             desc=self.cmd_BED_MESH_CALIBRATE_help)
-        if "BED_MESH_SET_ENABLE" not in self.gcode.ready_gcode_handlers:
-            self.gcode.register_command(
-                'BED_MESH_SET_ENABLE', self.cmd_BED_MESH_SET_ENABLE,
-                desc=self.cmd_BED_MESH_SET_ENABLE_helper)
-    def cmd_BED_MESH_SET_ENABLE(self, gcmd):
-        try:
-            if self.bedmesh and self.bedmesh.z_mesh:
-                self.bedmesh.z_mesh.isenable = True
-        except:
-            pass
-    cmd_BED_MESH_SET_ENABLE_helper = "set MESH enable "
     def _generate_points(self, error, probe_method="automatic"):
         x_cnt = self.mesh_config['x_count']
         y_cnt = self.mesh_config['y_count']
@@ -983,7 +972,6 @@ class MoveSplitter:
 class ZMesh:
     def __init__(self, params, name):
         self.profile_name = name or "adaptive-%X" % (id(self),)
-        self.isenable = True
         self.probed_matrix = self.mesh_matrix = None
         self.mesh_params = params
         self.mesh_offsets = [0., 0.]
@@ -1088,18 +1076,16 @@ class ZMesh:
     def get_y_coordinate(self, index):
         return self.mesh_y_min + self.mesh_y_dist * index
     def calc_z(self, x, y):
-        if self.isenable:
-            if self.mesh_matrix is not None:
-                tbl = self.mesh_matrix
-                tx, xidx = self._get_linear_index(x + self.mesh_offsets[0], 0)
-                ty, yidx = self._get_linear_index(y + self.mesh_offsets[1], 1)
-                z0 = lerp(tx, tbl[yidx][xidx], tbl[yidx][xidx+1])
-                z1 = lerp(tx, tbl[yidx+1][xidx], tbl[yidx+1][xidx+1])
-                return lerp(ty, z0, z1)
-            else:
-                # No mesh table generated, no z-adjustment
-                pass
-        return 0.
+        if self.mesh_matrix is not None:
+            tbl = self.mesh_matrix
+            tx, xidx = self._get_linear_index(x + self.mesh_offsets[0], 0)
+            ty, yidx = self._get_linear_index(y + self.mesh_offsets[1], 1)
+            z0 = lerp(tx, tbl[yidx][xidx], tbl[yidx][xidx+1])
+            z1 = lerp(tx, tbl[yidx+1][xidx], tbl[yidx+1][xidx+1])
+            return lerp(ty, z0, z1)
+        else:
+            # No mesh table generated, no z-adjustment
+            return 0.
     def get_z_range(self):
         if self.mesh_matrix is not None:
             mesh_min = min([min(x) for x in self.mesh_matrix])
