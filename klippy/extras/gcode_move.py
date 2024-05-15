@@ -28,7 +28,7 @@ class GCodeMove:
         handlers = [
             'G1', 'G20', 'G21',
             'M82', 'M83', 'G90', 'G91', 'G92', 'M220', 'M221',
-            'SET_GCODE_OFFSET', 'SAVE_GCODE_STATE', 'RESTORE_GCODE_STATE', 'SWAP_RESUME'
+            'SET_GCODE_OFFSET', 'SAVE_GCODE_STATE', 'RESTORE_GCODE_STATE'
         ]
         for cmd in handlers:
             func = getattr(self, 'cmd_' + cmd)
@@ -224,10 +224,6 @@ class GCodeMove:
             for pos, delta in enumerate(move_delta):
                 self.last_position[pos] += delta
             self.move_with_transform(self.last_position, speed)
-    def cmd_SWAP_RESUME(self, gcmd):
-        state = self.saved_states.get("M600_state")
-        if state is None:
-            self.gcode.run_script_from_command("RESUME")
     def cmd_SAVE_GCODE_STATE(self, gcmd):
         state_name = gcmd.get('NAME', 'default')
         self.saved_states[state_name] = {
