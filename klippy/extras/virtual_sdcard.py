@@ -53,7 +53,6 @@ class VirtualSD:
             "SDCARD_PRINT_FILE", self.cmd_SDCARD_PRINT_FILE,
             desc=self.cmd_SDCARD_PRINT_FILE_help)
         self.count = 0
-        self.count_line = 0
         self.toolhead_moved = False
     def handle_shutdown(self):
         if self.work_timer is not None:
@@ -327,7 +326,6 @@ class VirtualSD:
         return result
     # Background work timer
     def work_handler(self, eventtime):
-        self.count_line = 0
         import time
         # When the nozzle is moved
         mcu = self.printer.lookup_object('mcu', None)
@@ -405,7 +403,6 @@ class VirtualSD:
                         os.system("touch /tmp/layer_count_%s.temp" % self.index)
                 self.toolhead_moved = False
                 self.gcode.run_script(line)
-                self.count_line += 1
                 self.count += 1
             except self.gcode.error as e:
                 error_message = str(e)
@@ -431,7 +428,6 @@ class VirtualSD:
                 partial_input = ""
         logging.info("Exiting SD card print (position %d)", self.file_position)
         self.count = 0
-        self.count_line = 0
         state = {}
         self.work_timer = None
         self.cmd_from_sd = False
