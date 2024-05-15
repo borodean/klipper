@@ -330,21 +330,10 @@ class BedMeshCalibrate:
         self.gcode.register_command(
             'BED_MESH_CALIBRATE', self.cmd_BED_MESH_CALIBRATE,
             desc=self.cmd_BED_MESH_CALIBRATE_help)
-        if "BED_MESH_SET_DISABLE" not in self.gcode.ready_gcode_handlers:
-            self.gcode.register_command(
-                'BED_MESH_SET_DISABLE', self.cmd_BED_MESH_SET_DISABLE,
-                desc=self.cmd_BED_MESH_SET_DISABLE_helper)
         if "BED_MESH_SET_ENABLE" not in self.gcode.ready_gcode_handlers:
             self.gcode.register_command(
                 'BED_MESH_SET_ENABLE', self.cmd_BED_MESH_SET_ENABLE,
                 desc=self.cmd_BED_MESH_SET_ENABLE_helper)
-    def cmd_BED_MESH_SET_DISABLE(self, gcmd):
-        try:
-            if self.bedmesh and self.bedmesh.z_mesh:
-                self.bedmesh.z_mesh.isenable = False
-        except:
-            pass
-    cmd_BED_MESH_SET_DISABLE_helper = " set MESH disable"
     def cmd_BED_MESH_SET_ENABLE(self, gcmd):
         try:
             if self.bedmesh and self.bedmesh.z_mesh:
