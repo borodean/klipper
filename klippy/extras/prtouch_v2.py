@@ -13,7 +13,6 @@ import random
 
 # SELF_CHECK_PRTOUCH
 # START_STEP_PRTOUCH DIR=1 SPD=10 DIS=10
-# NOZZLE_CLEAR HOT_MIN_TEMP=140 HOT_MAX_TEMP=260 BED_MAX_TEMP=100
 # FORCE_MOVE STEPPER=stepper_x DISTANCE=5 VELOCITY=10
 # PID_CALIBRATE HEATER=extruder TARGET=210
 # PID_CALIBRATE HEATER=heater_bed TARGET=60
@@ -49,7 +48,7 @@ class PRTouchEndstopWrapper:
         self.public_step_res, self.pres_res = [], []
         self.public_read_swap_prtouch_cmd, self.public_start_step_prtouch_cmd = None, None
         self.public_write_swap_prtouch_cmd, self.read_pres_prtouch_cmd, self.start_pres_prtouch_cmd = None, None, None
-        self.bed_mesh, self.toolhead, self.bed_mesh, self.pheaters, self.heater_hot, self.heater_bed = None, None, None, None, None, None
+        self.bed_mesh, self.toolhead, self.bed_mesh, self.pheaters, self.heater_hot = None, None, None, None, None
         # 0. Base Cfg
         self.use_adc            = config.getboolean('use_adc', default=False)
         # 1. Tri Cfg
@@ -68,15 +67,11 @@ class PRTouchEndstopWrapper:
         self.shake_range        = config.getint('shake_range', default=0.5, minval=0.1, maxval=2)
         # 4. Clear Nozzle Cfg
         self.hot_min_temp       = config.getfloat('hot_min_temp', default=140, minval=80, maxval=200)
-        self.hot_max_temp       = config.getfloat('hot_max_temp', default=200, minval=180, maxval=300)
-        self.bed_max_temp       = config.getfloat('bed_max_temp', default=60, minval=45, maxval=100)
         self.pa_clr_dis_mm      = config.getfloat('pa_clr_dis_mm', default=30, minval=2, maxval=100)
-        self.pa_clr_down_mm     = config.getfloat('pa_clr_down_mm', default=-0.15, minval=-1, maxval=1)
         self.clr_noz_start_x    = config.getfloat('clr_noz_start_x', default=0, minval=0, maxval=1000)
         self.clr_noz_start_y    = config.getfloat('clr_noz_start_y', default=0, minval=0, maxval=1000)
         self.clr_noz_len_x      = config.getfloat('clr_noz_len_x', default=0, minval=self.pa_clr_dis_mm + 6, maxval=1000)
         self.clr_noz_len_y      = config.getfloat('clr_noz_len_y', default=0, minval=0, maxval=1000)
-        self.clr_xy_spd         = config.getfloat('clr_xy_spd', default=2.0, minval=0.1, maxval=10)
         # 5. Speed Cfg
         self.tri_z_down_spd     = config.getfloat('speed', default=(10 if self.use_adc else 2.5), minval=0.1, maxval=(30 if self.use_adc else 5)) # speed
         self.tri_z_up_spd       = config.getfloat('lift_speed', self.tri_z_down_spd * (1.0 if self.use_adc else 2.0), minval=0.1, maxval=100)
@@ -140,7 +135,6 @@ class PRTouchEndstopWrapper:
         self.step_mcu.register_config_callback(self._build_step_config)
         self.pres_mcu.register_config_callback(self._build_pres_config)
 
-        self.gcode.register_command('NOZZLE_CLEAR', self.cmd_NOZZLE_CLEAR, desc=self.cmd_NOZZLE_CLEAR_help)
         self.gcode.register_command('SAFE_DOWN_Z', self.cmd_SAFE_DOWN_Z, desc=self.cmd_SAFE_DOWN_Z_help)
         self.gcode.register_command('SAFE_MOVE_Z', self.cmd_SAFE_MOVE_Z, desc=self.cmd_SAFE_MOVE_Z_help)
         self.gcode.register_command('COARSE_HOME_Z', self.cmd_COARSE_HOME_Z, desc=self.cmd_COARSE_HOME_Z_help)
@@ -156,9 +150,8 @@ class PRTouchEndstopWrapper:
         self.toolhead   = self.printer.lookup_object("toolhead")
         self.pheaters   = self.printer.lookup_object('heaters')
         self.heater_hot = self.printer.lookup_object('extruder').heater
-        self.heater_bed = self.printer.lookup_object('heater_bed').heater
 
-        min_x, min_y = self.bed_mesh.bmc.mesh_min
+        min_x, _ = self.bed_mesh.bmc.mesh_min
         max_x, max_y = self.bed_mesh.bmc.mesh_max
 
         if self.clr_noz_start_x <= 0 or self.clr_noz_start_y <= 0 or self.clr_noz_len_x <= 0 or self.clr_noz_len_y <= 0:
@@ -294,12 +287,6 @@ class PRTouchEndstopWrapper:
             self.toolhead.get_last_move_time()
             eventtime = reactor.pause(eventtime + delay_s)
 
-    def _ck_g28ed(self):
-        for i in range(3):
-            if self.toolhead.kin.limits[i][0] > self.toolhead.kin.limits[i][1]:
-                self.gcode.run_script_from_command('G28')
-                break
-
     def _set_step_par(self, load_sys=True):
         if load_sys:
             self.toolhead.max_velocity = self.sys_max_velocity
@@ -372,13 +359,6 @@ class PRTouchEndstopWrapper:
         self.pheaters.set_temperature(self.heater_hot, temp, False)
         if wait:
             while not self.shut_down and abs(self.heater_hot.target_temp - self.heater_hot.smoothed_temp) > err and self.heater_hot.target_temp > 0:
-                self._delay_s(0.100)
-
-    def _set_bed_temps(self, temp, wait=False, err=5):
-        self._print_msg('SET_BED_TEMPS', 'temp=%.2f, wait=%d, err=%f'% (temp, wait, err))
-        self.pheaters.set_temperature(self.heater_bed, temp, False)
-        if wait:
-            while not self.shut_down and abs(self.heater_bed.target_temp - self.heater_bed.smoothed_temp) > err and self.heater_bed.target_temp > 0:
                 self._delay_s(0.100)
 
     def _shake_motor(self, cnt):
@@ -696,56 +676,6 @@ class PRTouchEndstopWrapper:
         self._print_ary('RES_Z', res_z, len(res_z))
         return res_z[int((len(res_z) - 1) / 2)] if len(res_z) != 2 else (res_z[0] + res_z[1]) / 2
 
-    def _clear_nozzle(self, hot_min_temp, hot_max_temp, bed_max_temp):
-        self._print_msg('CLEAR_NOZZLE', 'Start clear_nozzle(), hot_min_temp=%.2f, hot_max_temp=%.2f, bed_max_temp=%.2f' % (hot_min_temp, hot_max_temp, bed_max_temp))
-        min_x, min_y = self.clr_noz_start_x, self.clr_noz_start_y
-        self._set_bed_temps(temp=bed_max_temp, wait=False)
-        self._set_hot_temps(temp=hot_min_temp, wait=False, err=10)
-        self._ck_g28ed()
-        mesh = self.bed_mesh.get_mesh()
-        self.bed_mesh.set_mesh(None)
-        self._set_step_par(load_sys=False)
-        random.seed(time.time())
-        cur_pos = self.toolhead.get_position()
-        src_pos = [min_x + random.uniform(0, self.clr_noz_len_x - self.pa_clr_dis_mm - 5),
-                   min_y + random.uniform(0, self.clr_noz_len_y), self.bed_max_err, cur_pos[3]]
-        end_pos = [src_pos[0] + self.pa_clr_dis_mm, src_pos[1], src_pos[2], src_pos[3]]
-        self._set_hot_temps(temp=hot_min_temp, wait=True, err=10)
-        self._set_hot_temps(temp=hot_min_temp + 40, wait=False, err=10)
-
-        self._print_msg('CLEAR_NOZZLE', 'Start Src Pos Probe...')
-        self.public_move([src_pos[0], src_pos[1], src_pos[2]], self.rdy_xy_spd)
-        src_pos[2] = self.public_run_step_prtouch(self.g29_down_min_z, 0.1, False, 5, 3, True, self.tri_min_hold, self.tri_max_hold)
-        if self.use_adc:
-            self._set_fan_speed('heater_fan', self.fan_heat_max_spd)
-
-        self._print_msg('CLEAR_NOZZLE', 'Start End Pos Probe...')
-        self.public_move([end_pos[0], end_pos[1], end_pos[2]], self.rdy_xy_spd)
-        if self.use_adc:
-            self._set_fan_speed('heater_fan', self.fan_heat_min_spd)
-        self._set_fan_speed('fan', 0.0)
-        end_pos[2] = self.public_run_step_prtouch(self.g29_down_min_z, 0.1, False, 5, 3, True, self.tri_min_hold, self.tri_max_hold)
-
-        self._print_msg('CLEAR_NOZZLE', 'Down And Wait Temp For %.2f...' % hot_max_temp)
-        self.public_move([src_pos[0], src_pos[1], self.bed_max_err], self.rdy_xy_spd)
-        self.public_move([src_pos[0], src_pos[1], src_pos[2] - self.pa_clr_down_mm], self.rdy_z_spd)
-        self._set_hot_temps(temp=hot_max_temp, wait=True, err=10)
-
-        self._print_msg('CLEAR_NOZZLE', 'Start Clear The Noz...')
-        self.public_move(end_pos[:2] + [end_pos[2] + self.pa_clr_down_mm], self.clr_xy_spd)
-        self._set_fan_speed('fan', 1.0)
-
-        self._print_msg('CLEAR_NOZZLE', 'Start Cool Down The Noz...')
-        self._set_hot_temps(temp=hot_min_temp, wait=True, err=5)
-
-        self._print_msg('CLEAR_NOZZLE', 'Start Finish Clear...')
-        self.public_move([end_pos[0] + self.pa_clr_dis_mm, end_pos[1], end_pos[2] + self.bed_max_err], self.clr_xy_spd)
-        self._set_fan_speed('fan', 0.)
-        self._set_bed_temps(temp=bed_max_temp, wait=True, err=5)
-        self._set_step_par(load_sys=True)
-        self.bed_mesh.set_mesh(mesh)
-        self.gcode.run_script_from_command('G28 Z')
-
     def _run_G28_Z(self, accurate=True):
         self._print_msg('RUN_G28_Z', 'Start run_G28_Z()...')
         self.public_enable_steps()
@@ -853,13 +783,6 @@ class PRTouchEndstopWrapper:
             self._set_fan_speed('heater_fan', self.fan_heat_max_spd)
         self._set_step_par(load_sys=True)
         self.bed_mesh.set_mesh(mesh)
-
-    cmd_NOZZLE_CLEAR_help = "Clear the nozzle on bed."
-    def cmd_NOZZLE_CLEAR(self, gcmd):
-        hot_min_temp = gcmd.get_float('HOT_MIN_TEMP', self.hot_min_temp)
-        hot_max_temp = gcmd.get_float('HOT_MAX_TEMP', self.hot_max_temp)
-        bed_max_temp = gcmd.get_float('BED_MAX_TEMP', self.bed_max_temp)
-        self._clear_nozzle(hot_min_temp, hot_max_temp, bed_max_temp)
 
     cmd_START_STEP_PRTOUCH_help = "Start the step prtouch."
     def cmd_START_STEP_PRTOUCH(self, gcmd):
