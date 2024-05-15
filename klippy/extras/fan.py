@@ -107,7 +107,6 @@ class PrinterFan:
         gcode = config.get_printer().lookup_object('gcode')
         gcode.register_command("M106", self.cmd_M106)
         gcode.register_command("M107", self.cmd_M107)
-        self.v_sd = config.get_printer().lookup_object('virtual_sdcard', None)
     def get_status(self, eventtime):
         return self.fan.get_status(eventtime)
     def cmd_M106(self, gcmd):
