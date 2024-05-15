@@ -53,7 +53,6 @@ class VirtualSD:
             "SDCARD_PRINT_FILE", self.cmd_SDCARD_PRINT_FILE,
             desc=self.cmd_SDCARD_PRINT_FILE_help)
         self.count = 0
-        self.count_G1 = 0
         self.count_line = 0
         self.toolhead_moved = False
     def handle_shutdown(self):
@@ -408,8 +407,6 @@ class VirtualSD:
                 self.gcode.run_script(line)
                 self.count_line += 1
                 self.count += 1
-                if self.count_G1 < 20 and line.startswith("G1"):
-                    self.count_G1 += 1
             except self.gcode.error as e:
                 error_message = str(e)
                 try:
@@ -434,7 +431,6 @@ class VirtualSD:
                 partial_input = ""
         logging.info("Exiting SD card print (position %d)", self.file_position)
         self.count = 0
-        self.count_G1 = 0
         self.count_line = 0
         state = {}
         self.work_timer = None
