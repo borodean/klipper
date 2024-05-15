@@ -39,7 +39,6 @@ class PRTouchEndstopWrapper:
         self.printer = config.get_printer()
         self.shut_down = False
         self.has_save_sys_acc = False
-        self.safe_move_z_tri_call_back, self.safe_move_z_all_cnt = None, 0
         self.mm_per_step, self.pres_tri_time, self.step_tri_time, self.pres_tri_chs, self.pres_buf_cnt = 0, 0, 0, 0, 0
         self.mm_per_step = None
         self.sys_max_velocity, self.sys_max_accel, self.sys_max_z_velocity, self.sys_max_z_accel = 0, 0, 0, 0
@@ -133,7 +132,6 @@ class PRTouchEndstopWrapper:
         self.step_mcu.register_config_callback(self._build_step_config)
         self.pres_mcu.register_config_callback(self._build_pres_config)
 
-        self.gcode.register_command('SAFE_MOVE_Z', self.cmd_SAFE_MOVE_Z, desc=self.cmd_SAFE_MOVE_Z_help)
         self.gcode.register_command('COARSE_HOME_Z', self.cmd_COARSE_HOME_Z, desc=self.cmd_COARSE_HOME_Z_help)
         self.gcode.register_command('SELF_CHECK_PRTOUCH', self.cmd_SELF_CHECK_PRTOUCH, desc=self.cmd_SELF_CHECK_PRTOUCH_help)
         self.gcode.register_command('START_STEP_PRTOUCH', self.cmd_START_STEP_PRTOUCH, desc=self.cmd_START_STEP_PRTOUCH_help)
@@ -201,11 +199,6 @@ class PRTouchEndstopWrapper:
         for i in range(4):
             sdir = {'tick': params['tick%d' % i] / 10000., 'step': params['step%d' % i], 'index': params['index']}
             self.public_step_res.append(sdir)
-        if self.safe_move_z_tri_call_back is not None and len(self.public_step_res) == MAX_BUF_LEN:
-            run_dis = (self.safe_move_z_all_cnt - self.public_step_res[-1]['step']) * self.mm_per_step
-            self.safe_move_z_tri_call_back(run_dis)
-            self.safe_move_z_tri_call_back = None
-            self._print_msg('SAFE_MOVE_Z', 'tri_dis = %f' % run_dis, True)
 
     def _handle_result_run_pres_prtouch(self, params):
         self.pres_tri_time = params['tri_time'] / 10000.
@@ -587,33 +580,6 @@ class PRTouchEndstopWrapper:
             self._ck_and_raise_error(low_cnt > len(pnt_vals[i]) / 2, ERR_PRES_NOT_BE_SENSED)
         self._print_msg('DEBUG', '--Self Test 5 = PR_ERR_CODE_PRES_NOT_BE_SENSED, Pass!!--', force)
 
-    def _safe_move_z(self, run_sta, run_dis, run_spd, run_rdo, tri_call_back = None):
-        self._print_msg('SAFE_MOVE_Z', 'run_sta=%d, run_dis=%f, run_spd=%f, run_rdo=%f' % (run_sta, run_dis, run_spd, run_rdo))
-        run_dir = 1 if run_dis > 0 else 0
-        run_dis = math.fabs(run_dis)
-
-        self.safe_move_z_tri_call_back = tri_call_back
-
-        self.public_start_step_prtouch_cmd.send([self.public_step_oid, run_dir, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
-        self.start_pres_prtouch_cmd.send([self.public_pres_oid, run_dir, 0, 0, 0, 0, 0, 0, 0])
-
-        if run_sta == 1:
-            self.public_step_res, self.pres_res = [], []
-            self.public_enable_steps()
-            if run_spd == 0 or run_dis == 0 or run_rdo == 0:
-                return
-
-            self.deal_avgs_prtouch_cmd.send([self.public_pres_oid, 8])
-            step_cnt, step_us, acc_ctl = self.public_get_step_cnts(run_dis, run_spd)
-
-            if step_cnt == 0 or step_us == 0 or acc_ctl == 0:
-                return
-            self.safe_move_z_all_cnt = step_cnt
-            self.start_pres_prtouch_cmd.send([self.public_pres_oid, run_dir, self.tri_acq_ms, self.public_tri_send_ms, self.tri_need_cnt,
-                                              int(self.tri_hftr_cut * 1000), int(self.tri_lftr_k1 * 1000) if self.use_adc else int(self.tri_lftr_k1 * 1000 / run_rdo),
-                                              self.tri_min_hold if self.use_adc else int(self.tri_min_hold * run_rdo), self.tri_max_hold if self.use_adc else int(self.tri_max_hold * run_rdo)])
-            self.public_start_step_prtouch_cmd.send([self.public_step_oid, run_dir, self.public_tri_send_ms, step_cnt, step_us, acc_ctl, self.low_spd_nul, self.send_step_duty, 0])
-
     def public_run_step_prtouch(self, down_min_z, probe_min_3err, rt_last=False, pro_cnt=3, crt_cnt=3, fast_probe=False, tri_min_hold=None, tri_max_hold=None):
         if not tri_min_hold or not tri_max_hold:
             tri_min_hold = self.tri_min_hold
@@ -796,14 +762,6 @@ class PRTouchEndstopWrapper:
             self._delay_s(0.010)
         self.public_start_step_prtouch_cmd.send([self.public_step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
         self._ck_and_raise_error(len(self.public_step_res) != MAX_BUF_LEN, ERR_STEP_LOST_RUN_DATA, [len(self.public_step_res)])
-
-    cmd_SAFE_MOVE_Z_help = "Safe move z"
-    def cmd_SAFE_MOVE_Z(self, gcmd):
-        run_sta = gcmd.get_int('STA', 0)
-        run_dis = gcmd.get_float('DIS', +10)
-        run_spd = gcmd.get_float('SPD', 5.0)
-        run_rdo = gcmd.get_float('RDO', 1.0)
-        self._safe_move_z(run_sta, run_dis, run_spd, run_rdo)
 
     cmd_COARSE_HOME_Z_help = "Coarse home z"
     def cmd_COARSE_HOME_Z(self, gcmd):
