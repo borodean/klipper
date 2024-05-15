@@ -24,7 +24,6 @@ class GCodeMove:
         # Register g-code commands
         gcode = printer.lookup_object('gcode')
         self.gcode = gcode
-        self.laser_speed = 0.0
         handlers = [
             'G1', 'G20', 'G21',
             'M82', 'M83', 'G90', 'G91', 'G92', 'M220', 'M221',
@@ -146,10 +145,6 @@ class GCodeMove:
             if 'S' in params:
                 gcode_speed = float(params['S'])
                 self.gcode.run_script_from_command('M3 S%s' % gcode_speed)
-                self.laser_speed = gcode_speed
-            else:
-                if self.laser_speed:
-                    self.gcode.run_script_from_command('M5')
         except ValueError as e:
             raise gcmd.error("Unable to parse move '%s'"
                              % (gcmd.get_commandline(),))
