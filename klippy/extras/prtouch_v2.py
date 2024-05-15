@@ -727,7 +727,7 @@ class PRTouchEndstopWrapper:
             step_par_down, pres_par_down = list(self.step_res), list(self.pres_res)
             res_z.append(self.cal_tri_data(step_cnt_down, now_pos[2], step_par_down, pres_par_down, -lost_min_cnt * self.mm_per_step))
 
-            can_rt = True if (i == 1 and not self.use_adc and math.fabs(res_z[0] - res_z[1]) < 0.05 and crt_cnt != pro_cnt) else False
+            can_rt = bool(i == 1 and not self.use_adc and math.fabs(res_z[0] - res_z[1]) < 0.05 and crt_cnt != pro_cnt)
             can_rt = True if (can_rt and tri_base_radio <= 1.0) else (i == (crt_cnt - 1)) and (max(res_z) - min(res_z) <= probe_min_3err)
 
             up_min_z = (step_cnt_down - self.step_res[-1]['step']) * self.mm_per_step
@@ -948,7 +948,7 @@ class PRTouchEndstopWrapper:
         # 4. Set hot temp to old target
         if self.g28_wait_cool_down:
             self.print_msg('DEBUG', 'G28_Z: Wait for Nozzle to recovery[%.2f -> %.2f]...' % (self.hot_min_temp, target_temp))
-            self.set_hot_temps(temp=target_temp, wait=True if target_temp > self.hot_min_temp else False, err=5)
+            self.set_hot_temps(temp=target_temp, wait=target_temp > self.hot_min_temp, err=5)
         if self.use_adc:
             self.set_fan_speed('heater_fan', self.fan_heat_max_spd)
         self.set_step_par(load_sys=True)
