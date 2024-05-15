@@ -6,7 +6,6 @@
 
 class PauseResume:
     def __init__(self, config):
-        self.config = config
         self.printer = config.get_printer()
         self.gcode = self.printer.lookup_object('gcode')
         self.recover_velocity = config.getfloat('recover_velocity', 50.)
@@ -58,14 +57,10 @@ class PauseResume:
                 self.sd_paused = False
                 self.gcode.respond_info("action:paused")
             self.pause_command_sent = True
-            self.printer.lookup_object('toolhead').move_queue.flush()
     cmd_PAUSE_help = ("Pauses the current print")
     def cmd_PAUSE(self, gcmd):
-        import os, time
-        reactor = self.printer.get_reactor()
-        count = 0
         if self.is_paused:
-            gcmd.respond_info("Print is not paused, resume aborted")
+            gcmd.respond_info("Print already paused")
             return
         self.send_pause_command()
         self.gcode.run_script_from_command("SAVE_GCODE_STATE NAME=PAUSE_STATE")
@@ -78,7 +73,6 @@ class PauseResume:
         else:
             self.gcode.respond_info("action:resumed")
         self.pause_command_sent = False
-        self.printer.lookup_object('toolhead').move_queue.flush()
     cmd_RESUME_help = ("Resumes the print from a pause")
     def cmd_RESUME(self, gcmd):
         if not self.is_paused:
