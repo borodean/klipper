@@ -285,44 +285,6 @@ class VirtualSD:
             if (buf.startswith("G1") or buf.startswith("G0") or buf.startswith(";")) and buf.endswith("\n"):
                 break
         return buf
-    def getXYZE(self, file_path, file_position):
-        result = {"X": 0, "Y": 0, "Z": 0, "E": 0}
-        try:
-            import io
-            with io.open(file_path, "r", encoding="utf-8") as f:
-                f.seek(file_position)
-                while True:
-                    cur_pos = f.tell()
-                    if cur_pos <= 0:
-                        break
-                    line = self.tail_read(f)
-                    line_list = line.split(" ")
-                    if not result["E"] and "E" in line:
-                        for obj in line_list:
-                            if obj.startswith("E"):
-                                ret = obj[1:].split("\r")[0]
-                                ret = ret.split("\n")[0]
-                                if ret.startswith("."):
-                                    result["E"] = float(("0" + ret.strip(" ")))
-                                else:
-                                    result["E"] = float(ret.strip(" "))
-                    if not result["X"] and not result["Y"]:
-                        for obj in line_list:
-                            if obj.startswith("X"):
-                                result["X"] = float(obj.split("\r")[0][1:])
-                            if obj.startswith("Y"):
-                                result["Y"] = float(obj.split("\r")[0][1:])
-                    if not result["Z"] and "Z" in line:
-                        for obj in line_list:
-                            if obj.startswith("Z"):
-                                result["Z"] = float(obj.split("\r")[0][1:])
-                    if result["X"] and result["Y"] and result["Z"] and result["E"]:
-                        logging.info("get XYZE:%s" % str(result))
-                        break
-                    self.reactor.pause(self.reactor.monotonic() + .001)
-        except Exception as err:
-            logging.exception(err)
-        return result
     # Background work timer
     def work_handler(self, eventtime):
         import time
