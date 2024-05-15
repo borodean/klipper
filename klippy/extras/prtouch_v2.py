@@ -266,7 +266,6 @@ class PRTouchEndstopWrapper:
         self.manual_get_pres_cmd = self.pres_mcu.lookup_query_command('manual_get_pres oid=%c index=%c', 'resault_manual_get_pres oid=%c index=%c tri_time=%u tri_chs=%c buf_cnt=%u tick_0=%u ch0_0=%i ch1_0=%i ch2_0=%i ch3_0=%i tick_1=%u ch0_1=%i ch1_1=%i ch2_1=%i ch3_1=%i', oid=self.pres_oid)
         pass
 
-    #region Handles
     def _handle_step_debug_prtouch(self, params):
         self.ver_step = 'V' + str(params['version'] / 100)
         pass
@@ -299,9 +298,7 @@ class PRTouchEndstopWrapper:
     def _handle_result_read_pres_prtouch(self, params):
         self.pres_res.append(params)
         pass
-    #endregion
 
-    #region System
     def get_mcu(self):
         return self.step_mcu
 
@@ -337,9 +334,7 @@ class PRTouchEndstopWrapper:
 
     def probe_finish(self, hmove):
         pass
-    #endregion
 
-    #region Prtouch
     def print_msg(self, title, msg, force=False):
         logging.info('[%s] %s' , title, msg)
         if not self.show_msg and not force:
@@ -492,7 +487,6 @@ class PRTouchEndstopWrapper:
             if wait:
                 self.toolhead.wait_moves()
             pass
-    #endregion
 
     def set_fan_speed(self, fan_name='None', fan_spd=0.):
         self.print_msg('SET_FAN_SPEED', 'fan_name=%s, fan_spd=%f' % (fan_name, fan_spd))
