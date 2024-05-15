@@ -268,12 +268,10 @@ class PRTouchEndstopWrapper:
 
     #region Handles
     def _handle_step_debug_prtouch(self, params):
-        # self.print_msg('HD_STEP_DEBUG', str(params))
         self.ver_step = 'V' + str(params['version'] / 100)
         pass
 
     def _handle_result_run_step_prtouch(self, params):
-        # self.print_msg('HD_RUN_STEP', str(params))
         self.step_tri_time = params['tri_time'] / 10000.
         for i in range(4):
             sdir = {'tick': params['tick%d' % i] / 10000., 'step': params['step%d' % i], 'index': params['index']}
@@ -286,12 +284,10 @@ class PRTouchEndstopWrapper:
         pass
 
     def _handle_pres_debug_prtouch(self, params):
-        # self.print_msg('HD_PRES_DEBUG', str(params))
         self.ver_pres = 'V' + str(params['version'] / 100)
         pass
 
     def _handle_result_run_pres_prtouch(self, params):
-        # self.print_msg('HD_RUN_PRES', str(params))
         self.pres_tri_time = params['tri_time'] / 10000.
         self.pres_tri_chs = params['tri_chs']
         self.pres_buf_cnt = params['buf_cnt']
@@ -301,7 +297,6 @@ class PRTouchEndstopWrapper:
         pass
 
     def _handle_result_read_pres_prtouch(self, params):
-        # self.print_msg('HD_READ_PRES', str(params), True)
         self.pres_res.append(params)
         pass
     #endregion
@@ -409,9 +404,6 @@ class PRTouchEndstopWrapper:
         self.print_msg('RAISE_ERROR', str(err_code), True)
         err_code['msg'] = 'Shutdown due to ' + err_code['msg']
         self.printer.invoke_shutdown(str(err_code))
-        # while True:
-        #     self.delay_s(1.)
-        #     self.print_msg('RAISE_ERROR', str(err_code), True)
         raise self.printer.command_error(str(err_code))
 
     def send_wave_tri(self, ch, ary):
@@ -604,12 +596,6 @@ class PRTouchEndstopWrapper:
 
         # 0. Send Debut Msg.
         self.print_res()
-        # for i in range(self.pres_cnt):
-        #     tmp_buf = []
-        #     for j in range(len(pres_res)):
-        #         tmp_buf.append(pres_res[j]['ch%d' % i])
-        #     self.send_wave_tri(i, tmp_buf)
-        #     pass
         # 1. Get Best Tri Ch
         max_x, max_y = self.bed_mesh.bmc.mesh_max
         _valid_ch, l_chs = self.get_valid_ch()
@@ -623,8 +609,6 @@ class PRTouchEndstopWrapper:
                 pres_t_buf.append(pres_res[i]['tick'] - self.pres_tri_time)
                 pres_d_buf.append(pres_res[i]['ch%d' % valid_ch])
                 pass
-            # self.print_ary('CAL_TRI_TICK_CH%d' % valid_ch, pres_t_buf, len(pres_t_buf), 3)
-            # self.print_ary('CAL_TRI_DATA_CH%d' % valid_ch, pres_d_buf, len(pres_d_buf), 0)
 
             # 3. Copy Step Tick And Data.
             step_t_buf, step_d_buf = [], []
@@ -632,8 +616,6 @@ class PRTouchEndstopWrapper:
                 step_t_buf.append(step_res[i]['tick'] - self.step_tri_time)
                 step_d_buf.append(step_res[i]['step'])
                 pass
-            # self.print_ary('CAL_TRI_TICK_CH%d' % valid_ch, step_t_buf, len(step_t_buf), 3)
-            # self.print_ary('CAL_TRI_DATA_CH%d' % valid_ch, step_d_buf, len(step_d_buf), 0)
 
             # 4. Filter The Pres Data
             if not self.use_adc:
@@ -662,7 +644,6 @@ class PRTouchEndstopWrapper:
             sin_angle, cos_angle = math.sin(-angle), math.cos(-angle)
             for i in range(len(vals_p)):
                 vals_p[i] = (i - 0) * sin_angle + (vals_p[i] - 0) * cos_angle + 0
-            # self.print_ary('SINCOS', 'sincos = ', vals_p, len(vals_p), 2)
             pres_tri_index = vals_p.index(min(vals_p))
             pres_tri_tick = pres_t_buf[pres_tri_index]
             # 6. Cal The Step Tri Index And Tick
@@ -892,8 +873,6 @@ class PRTouchEndstopWrapper:
 
             self.step_res, self.pres_res = [], []
             self.start_step_prtouch_cmd.send([self.step_oid, 1, self.tri_send_ms, step_cnt_up, step_us_up, acc_ctl_cnt, self.low_spd_nul, self.send_step_duty, 0])
-            # if can_rt: # and rt_last:
-            #     break
             t_last = time.time()
             while (time.time() - t_last < (down_min_z / self.tri_z_down_spd + 5)) and (len(self.step_res) != MAX_BUF_LEN):
                 self.delay_s(0.010)
@@ -944,40 +923,29 @@ class PRTouchEndstopWrapper:
 
             pres_data_l = [i * -1 for i in pres_data_l] if pres_data_l[0] > pres_data_l[-1] else pres_data_l
             pres_data_r = [i * -1 for i in pres_data_r] if pres_data_r[0] > pres_data_r[-1] else pres_data_r
-            # self.print_ary('PRES_TICK_L', pres_tick_l, len(pres_tick_l), 3)
-            # self.print_ary('PRES_DATA_L', pres_data_l, len(pres_data_l), 0)
-            # self.print_ary('PRES_TICK_R', pres_tick_r, len(pres_tick_r), 3)
-            # self.print_ary('PRES_DATA_R', pres_data_r, len(pres_data_r), 0)
 
             min_val, max_val = min(pres_data_l), max(pres_data_l)
             for i in range(len(pres_data_l)):
                 pres_data_l[i] = (pres_data_l[i] - min_val) / (max_val - min_val)
-            # self.print_ary('NORM_PRES_DATA_L', pres_data_l, len(pres_data_l), 3)
             angle = math.atan((pres_data_l[-1] - pres_data_l[0]) / len(pres_data_l))
             sin_angle, cos_angle = math.sin(-angle), math.cos(-angle)
             for i in range(len(pres_data_l)):
                 pres_data_l[i] = (i - 0) * sin_angle + (pres_data_l[i] - 0) * cos_angle + 0
             l_index = pres_data_l.index(min(pres_data_l))
-            # self.print_ary('CYCLE_PRES_DATA_L', pres_data_l, len(pres_data_l), 3)
 
             min_val, max_val = min(pres_data_r), max(pres_data_r)
             for i in range(len(pres_data_r)):
                 pres_data_r[i] = (pres_data_r[i] - min_val) / (max_val - min_val)
-            # self.print_ary('NORM_PRES_DATA_R',pres_data_r, len(pres_data_r), 3)
             angle = math.atan((pres_data_r[-1] - pres_data_r[0]) / len(pres_data_r))
             sin_angle, cos_angle = math.sin(-angle), math.cos(-angle)
             for i in range(len(pres_data_r)):
                 pres_data_r[i] = (i - 0) * sin_angle + (pres_data_r[i] - 0) * cos_angle + 0
             r_index = pres_data_r.index(min(pres_data_r))
-            # self.print_ary('CYCLE_PRES_DATA_R',  pres_data_r, len(pres_data_r), 3)
 
             l_tick = pres_tick_l[l_index]
             r_tick = pres_tick_r[r_index]
 
             gap_z = ((r_tick - mid_tick) - (mid_tick - l_tick)) * self.z_gap_spd
-
-            # self.print_msg('CAL_GAPS', 'l_tick=%f, mid_tick=%f, r_tick=%f, (r_tick - mid_tick)=%f, (mid_tick - l_tick)=%f, ((r_tick - mid_tick) - (mid_tick - l_tick))=%f, gap=%f'
-            #                % (l_tick, mid_tick, r_tick, (r_tick - mid_tick), (mid_tick - l_tick), ((r_tick - mid_tick) - (mid_tick - l_tick)), gap_z))
 
             gap_z = gap_z if gap_z <= 0.1 else 0.1
             gap_z = gap_z if gap_z >= 0.0 else 0.0
@@ -1022,7 +990,6 @@ class PRTouchEndstopWrapper:
                         err_ps.append(mid_p)
                         self.print_msg('ERR_POINT', str(rdn_p))
             self.print_msg('RE_PROBE_POINT', str(err_ps))
-            # self.ck_and_raise_error(r == 2 and len(err_ps) > 0, PR_ERR_CODE_CAL_ERR_POINT, err_ps)
             for i in range(len(err_ps)):
                 self.run_to_next(err_ps[i])
                 err_ps[i][2] = self.run_step_prtouch(self.g29_down_min_z, self.probe_min_3err, True, 5, 3, True, tri_min_hold=int(self.tri_min_hold * 2), tri_max_hold=int(self.tri_max_hold * 1.5))
@@ -1106,7 +1073,6 @@ class PRTouchEndstopWrapper:
     def clear_nozzle(self, hot_min_temp, hot_max_temp, bed_max_temp):
         self.print_msg('CLEAR_NOZZLE', 'Start clear_nozzle(), hot_min_temp=%.2f, hot_max_temp=%.2f, bed_max_temp=%.2f' % (hot_min_temp, hot_max_temp, bed_max_temp))
         min_x, min_y = self.clr_noz_start_x, self.clr_noz_start_y
-        # max_x, max_y = self.clr_noz_start_x + self.clr_noz_len_x, self.clr_noz_start_y + self.clr_noz_len_y
         self.set_bed_temps(temp=bed_max_temp, wait=False)
         self.set_hot_temps(temp=hot_min_temp, wait=False, err=10)
         self.ck_g28ed()
@@ -1322,7 +1288,6 @@ class PRTouchEndstopWrapper:
                 self.run_to_next(res1[i], True)
                 res1[i][2] = self.run_step_prtouch(self.g29_down_min_z, self.probe_min_3err, True, 5, 3, True)
             self.run_G28_Z()
-        # self.ck_and_raise_error(math.fabs(res_z) > self.lost_step_dis and self.lost_step_dis > 0, PR_ERR_CODE_HAVE_LOST_STEP)
 
         self.best_above_z = int(self.best_above_z / 2)
         self.rdy_z_spd /= 0.75
@@ -1487,7 +1452,6 @@ class PRTouchEndstopWrapper:
                     self.delay_s(0.010)
                 self.start_step_prtouch_cmd.send([self.step_oid, 1, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
                 self.ck_and_manual_get_step()
-                # self.ck_and_raise_error(len(self.step_res) != MAX_BUF_LEN, PR_ERR_CODE_STEP_LOST_RUN_DATA, [MAX_BUF_LEN, len(self.step_res)])
                 down_dis -= self.safe_z_dead_dis
             self.step_res, self.pres_res = [], []
             params = self.deal_avgs_prtouch_cmd.send([self.pres_oid, 8])
@@ -1504,7 +1468,6 @@ class PRTouchEndstopWrapper:
             self.start_pres_prtouch_cmd.send([self.pres_oid, 1, 0, 0, 0, 0, 0, 0, 0])
             self.print_res('cmd_SAFE_DOWN_Z')
             self.ck_and_manual_get_step()
-            # self.ck_and_raise_error(len(self.step_res) != MAX_BUF_LEN, PR_ERR_CODE_STEP_LOST_RUN_DATA, [MAX_BUF_LEN, len(self.step_res)])
 
         if up_dis != 0:
             if self.safe_z_dead_dis != 0 and up_dis > self.safe_z_dead_dis + 1:
@@ -1516,7 +1479,6 @@ class PRTouchEndstopWrapper:
                     self.delay_s(0.010)
                 self.start_step_prtouch_cmd.send([self.step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
                 self.ck_and_manual_get_step()
-                # self.ck_and_raise_error(len(self.step_res) != MAX_BUF_LEN, PR_ERR_CODE_STEP_LOST_RUN_DATA, [MAX_BUF_LEN, len(self.step_res)])
                 up_dis -= self.safe_z_dead_dis
             self.step_res, self.pres_res = [], []
             params = self.deal_avgs_prtouch_cmd.send([self.pres_oid, 8])
@@ -1532,7 +1494,6 @@ class PRTouchEndstopWrapper:
             self.start_step_prtouch_cmd.send([self.step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
             self.start_pres_prtouch_cmd.send([self.pres_oid, 0, 0, 0, 0, 0, 0, 0, 0])
             self.ck_and_manual_get_step()
-            # self.ck_and_raise_error(len(self.step_res) != MAX_BUF_LEN, PR_ERR_CODE_STEP_LOST_RUN_DATA, [MAX_BUF_LEN, len(self.step_res)])
         pass
 
     cmd_TRIG_TEST_help = "Test The Tri is Normal"
@@ -1550,41 +1511,9 @@ class PRTouchEndstopWrapper:
 
     cmd_TEST_PRTH_help = "For Debug Cmd"
     def cmd_TEST_PRTH(self, gcmd):
-        # self.env_self_check(force=True)
-        # self.print_msg('%f' % self.noz_ex_com)
-        # zero_z = gcmd.get_float('Z', 0)
-        # self.run_gap_prtouch(zero_z)
-        # self.shake_motor(self.shake_cnt)
-        # spd = gcmd.get_float('S', 0)
-        # self.set_fan_speed('heater_fan', spd)
-        # self.set_fan_speed('fan', 1.0)
-        # read_cnt = gcmd.get_int('C', 1)
-        # for i in range(read_cnt):
-        #     self.gcode.run_script_from_command('BED_MESH_CALIBRATE')
-        #     self.gcode.run_script_from_command('BED_MESH_OUTPUT')
-
-        # x_cnt = self.bed_mesh.bmc.mesh_config['x_count']
-        # y_cnt = self.bed_mesh.bmc.mesh_config['y_count']
-        # min_x, min_y = self.bed_mesh.bmc.mesh_min
-        # max_x, max_y = self.bed_mesh.bmc.mesh_max
-
-        # x_len = (max_x - min_x) / x_cnt
-        # y_len = (max_y - min_y) / y_cnt
-
-        # res1 = []
-        # for i in range(x_cnt * y_cnt):
-        #     res1.append([int((i % x_cnt) * x_len + min_x), int(int(i / y_cnt) * int(y_len) + min_y), 0.01 * i])
         self.ck_and_raise_error(True, PR_ERR_CODE_G28_Z_DETECTION_TIMEOUT)
         pass
 
 def load_config(config):
     vrt = PRTouchEndstopWrapper(config)
-    # config.get_printer().add_object('probe', probe.PrinterProbe(config, vrt))
     return vrt
-
-
-# /home/cc/moonraker-env/bin/python3.10 /home/cc/moonraker/moonraker/moonraker.py -d /home/cc/printer_data
-# sudo service klipper stop
-# /home/cc/klippy-env/bin/python3.10 /home/cc/klipper/klippy/klippy.py /home/cc/printer_data/config/printer.cfg -a /home/cc/printer_data/comms/klippy.sock -l /home/cc/printer_data/logs/klippy.log
-# ./micropython /home/cc/klipper/klippy/klippy.py /home/cc/printer_data/config/printer.cfg -a /home/cc/printer_data/comms/klippy.sock -l /home/cc/printer_data/logs/klippy.log
-# /home/cc/klippy-env/bin/python3.10 /home/cc/micropython_test/klipper/klippy/klippy.py /home/cc/printer_data/config/printer.cfg -a /home/cc/printer_data/comms/klippy.sock -l /home/cc/printer_data/logs/klippy.log

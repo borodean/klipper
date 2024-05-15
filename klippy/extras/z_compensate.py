@@ -40,7 +40,6 @@ class ZCompensateInit:
 
         self.vs_start_z_pos     = config.getfloat('vs_start_z_pos', default=3, minval=0, maxval=10)
         self.show_msg = config.getboolean('show_msg', default=False)
-        # self.bl_offset =[28,-2]
         self.bl_offset = [0,0]
         self.bl_offset[0], self.bl_offset[1] = config.getfloatlist('bl_offset', count=2)
 
@@ -135,9 +134,6 @@ class ZCompensateInit:
         self.print_msg('RAISE_ERROR', str(err_code), True)
         err_code['msg'] = 'Shutdown due to ' + err_code['msg']
         self.printer.invoke_shutdown(str(err_code))
-        # while True:
-        #     self.delay_s(1.)
-        #     self.print_msg('RAISE_ERROR', str(err_code), True)
         raise self.printer.command_error(str(err_code))
         pass
 
@@ -183,7 +179,6 @@ class ZCompensateInit:
         pass
     def cr10se_clear_nozzle(self, hot_start_temp, hot_rub_temp, hot_end_temp, bed_add_temp):
         min_x, min_y = self.clr_noz_start_x, self.clr_noz_start_y
-        # max_x, max_y = self.clr_noz_start_x + self.clr_noz_len_x, self.clr_noz_start_y + self.clr_noz_len_y
         if self.type_nozz == 1 :
             hot_start_temp = hot_end_temp = hot_rub_temp
         self.set_bed_temps(temp=bed_add_temp, wait=False)
@@ -201,7 +196,6 @@ class ZCompensateInit:
         self.move([src_pos[0], src_pos[1], src_pos[2]], self.rdy_xy_spd)
         src_pos[2] = self.prtouch.run_step_prtouch(self.g29_down_min_z, 0, False, self.pr_clear_probe_cnt, self.pr_clear_probe_cnt, True, self.tri_min_hold, self.tri_max_hold)
         self.move([end_pos[0], end_pos[1], end_pos[2]], self.rdy_xy_spd)
-        # self.set_fan_speed('fan', 0.0)
         end_pos[2] = self.prtouch.run_step_prtouch(self.g29_down_min_z, 0, False, self.pr_clear_probe_cnt, self.pr_clear_probe_cnt, True, self.tri_min_hold, self.tri_max_hold)
         self.move([src_pos[0], src_pos[1], self.bed_max_err], self.rdy_xy_spd)
         self.move([src_pos[0], src_pos[1] + 5, src_pos[2] - self.pa_clr_down_mm], self.rdy_z_spd)#移到擦喷嘴起始点
@@ -212,12 +206,10 @@ class ZCompensateInit:
         cur_pos = self.toolhead.get_position()
         end_pos[3] = cur_pos[3]
         self.move([end_pos[0], end_pos[1] - 5, end_pos[2] + self.pa_clr_down_mm], self.clr_xy_spd)# 擦喷嘴
-        # self.set_fan_speed('fan', 1.0)
         self.gcode.run_script_from_command('M106 S255')
         self.set_hot_temps(temp=hot_end_temp, wait=True, err=5)
         self.set_bed_temps(temp=bed_add_temp, wait=True, err=5) #等待降温
         self.move([end_pos[0] + self.pa_clr_dis_mm, end_pos[1], end_pos[2] + self.bed_max_err], 100) #上抬
-        # self.set_fan_speed('fan', 0.)
         self.gcode.run_script_from_command('M107')
         self.set_bed_temps(temp=bed_add_temp, wait=True, err=5)
         self.set_step_par(load_sys=True)
@@ -273,14 +265,6 @@ class ZCompensateInit:
             pr_data[i]= self.prtouch.run_step_prtouch(self.g29_down_min_z, 0, False, self.pr_probe_cnt, self.pr_probe_cnt, True)
             z_offset[i] =  bl_data[i][2]  - pr_data[i]
 
-        # self.move([self.z_offset_pos2[0] + self.bl_offset[0], self.z_offset_pos2[1] + self.bl_offset[1]] + [5, now_pos[3]], 100)
-        # bl_data3 = self.printer.lookup_object('probe').run_probe(gcmd)
-
-        # self.prtouch.move([self.z_offset_pos2[0], self.z_offset_pos2[1]] + [3, now_pos[3]], 100)
-        # self.prtouch.get_mm_per_step()
-        # pr_data[1]= self.prtouch.run_step_prtouch(self.g29_down_min_z, 0, False, 5, 5, True)
-        # z_offset[1] = bl_data3[2]  - pr_data[1]
-
         z_offset_old = self.printer.lookup_object('probe').z_offset
 
         for i in [0,1]:
@@ -292,11 +276,9 @@ class ZCompensateInit:
 
         self.z_offset_move = z_offset_old - z_offset_new
         self.gcode.run_script_from_command('SET_GCODE_OFFSEt Z_ADJUST=%f MOVE=1' % (self.z_offset_move))
-        # self.print_ary('z_offset_move = %f\n' %(0-z_offset_move), 1, True)
 
         # #把Z轴补偿写到cfg文件中
         configfile = self.printer.lookup_object('configfile')
-        # new_calibrate = z_offset_old - res_z
         new_calibrate = z_offset_new
         self.pnt_msg('z_offset_new = %f ' %(new_calibrate))
 
