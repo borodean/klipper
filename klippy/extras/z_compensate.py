@@ -7,12 +7,9 @@ import time
 import random
 
 
-PR_ERR_CODE_CAL_DATA_ERROR          = {'code':'key401', 'msg':'PR_ERR_CODE_CAL_DATA_ERROR: An error occurred during data calculation..', 'values':[]}
 PR_ERR_CODE_Z_OFFSET_CALIBRATION    = {'code':'key401', 'msg':'PR_ERR_CODE_Z_OFFSET_CALIBRATION: Ceramic pressure sensitive mistrigger..', 'values':[]}
 PR_ERR_CODE_SSAP_TEST_ERROR         = {'code':'key402', 'msg':'PR_ERR_CODE_SSAP_TEST_ERROR: Synchronization line communication is not available, please check the connection..', 'values':[]}
 MAX_BUF_LEN = 32
-MAX_PRES_CNT = 4
-MAX_STEP_CNT = 4
 class ZCompensateInit:
     def __init__(self, config):
         self.config         = config

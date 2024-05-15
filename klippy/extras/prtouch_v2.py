@@ -34,20 +34,14 @@ PR_ERR_CODE_PRES_VAL_IS_CONSTANT    = {'code':'key521', 'msg':'PR_ERR_CODE_PRES_
 PR_ERR_CODE_PRES_NOT_BE_SENSED      = {'code':'key522', 'msg':'PR_ERR_CODE_PRES_NOT_BE_SENSED: The pressure data in channel={0} cannot be properly sensed.', 'values':[]}
 PR_ERR_CODE_PRES_LOST_RUN_DATA      = {'code':'key523', 'msg':'PR_ERR_CODE_PRES_LOST_RUN_DATA: The pressure data is lost when the probe is over and waiting for the data to be sent back.', 'values':[]}
 PR_ERR_CODE_PRES_NOISE_TOO_BIG      = {'code':'key524', 'msg':'PR_ERR_CODE_PRES_NOISE_TOO_BIG: Sensor data noise is too big, channel={0}.', 'values':[]}
-PR_ERR_CODE_PRESS_TOO_LARGE         = {'code':'key525', 'msg':'PR_ERR_CODE_PRESS_TOO_LARGE: Excessive pressure was detected, possibly from the nozzle scraping the hot bed, channel={0}.', 'values':[]}
 PR_ERR_CODE_HAVE_LOST_STEP          = {'code':'key526', 'msg':'PR_ERR_CODE_HAVE_LOST_STEP: Z-axis motor step loss was found.', 'values':[]}
 PR_ERR_CODE_STEP_LOST_RUN_DATA      = {'code':'key527', 'msg':'PR_ERR_CODE_STEP_LOST_RUN_DATA: The motor step data is lost when the probe is over and waiting for data return', 'values':[]}
-PR_ERR_CODE_FATESTART_TO_LOW        = {'code':'key528', 'msg':'PR_ERR_CODE_FATESTART_TO_LOW: [bed_mesh] -> Fate_start is too small and must be greater than 0..', 'values':[]}
 PR_ERR_CODE_G28_Z_DETECTION_TIMEOUT = {'code':'key529', 'msg':'PR_ERR_CODE_G28_Z_DETECTION_TIMEOUT: G28 Z try probe out of times.', 'values':[]}
 PR_ERR_CODE_G28_Z_DETECTION_ERROR   = {'code':'key530', 'msg':'PR_ERR_CODE_G28_Z_DETECTION_ERROR: G28 Z probe ERROR.', 'values':[]}
-PR_ERR_CODE_G29_Z_DETECTION_TIMEOUT = {'code':'key531', 'msg':'PR_ERR_CODE_G29_Z_DETECTION_TIMEOUT: G29 Z probe timed out.', 'values':[]}
 PR_ERR_CODE_SWAP_PIN_DETECTI        = {'code':'key532', 'msg':'PR_ERR_CODE_SWAP_PIN_DETECTI: The synchronization pin test failed, pres_swap_pin={0}, step_swap_pin={1}.', 'values':[]}
 PR_ERR_CODE_CK_BED_MESH_OUT_RANGE   = {'code':'key533', 'msg':'PR_ERR_CODE_CK_BED_MESH_OUT_RANGE: A hot bed tilting procedure that differs too much from bed_mesh data.', 'values':[]}
-PR_ERR_CODE_CAL_DATA_ERROR          = {'code':'key534', 'msg':'PR_ERR_CODE_CAL_DATA_ERROR: An error occurred during data calculation..', 'values':[]}
-PR_ERR_CODE_CAL_ERR_POINT           = {'code':'key535', 'msg':'PR_ERR_CODE_CAL_ERR_POINT: Multiple abnormal measurement points occur and cannot be corrected by measurement.', 'values':[]}
 
 MAX_PRES_CNT = 4
-MAX_STEP_CNT = 4
 MAX_BUF_LEN = 32
 
 
