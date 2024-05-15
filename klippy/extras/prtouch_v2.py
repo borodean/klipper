@@ -14,7 +14,6 @@ PR_VERSION = 307
 
 # COMMANDS
 
-# READ_PRES C=100
 # TEST_SWAP
 # DEAL_AVGS
 # TRIG_TEST C=10
@@ -55,7 +54,6 @@ class PRTouchEndstopWrapper:
         self.mm_per_step, self.pres_tri_time, self.step_tri_time, self.pres_tri_chs, self.pres_buf_cnt = 0, 0, 0, 0, 0
         self.rdy_pos, self.gap_pos = None, None
         self.mm_per_step = None
-        self.ver_step, self.ver_pres, self.ver_prth = 'V0.0', 'V0.0', ('V' + str(PR_VERSION / 100))
         self.sys_max_velocity, self.sys_max_accel, self.sys_max_z_velocity, self.sys_max_z_accel = 0, 0, 0, 0
 
         self.public_step_res, self.pres_res = [], []
@@ -156,7 +154,6 @@ class PRTouchEndstopWrapper:
         self.step_mcu.register_config_callback(self._build_step_config)
         self.pres_mcu.register_config_callback(self._build_pres_config)
 
-        self.gcode.register_command('READ_PRES', self.cmd_READ_PRES, desc=self.cmd_READ_PRES_help)
         self.gcode.register_command('TEST_SWAP', self.cmd_TEST_SWAP, desc=self.cmd_TEST_SWAP_help)
         self.gcode.register_command('DEAL_AVGS', self.cmd_DEAL_AVGS, desc=self.cmd_DEAL_AVGS_help)
         self.gcode.register_command('TRIG_TEST', self.cmd_TRIG_TEST, desc=self.cmd_TRIG_TEST_help)
@@ -169,10 +166,7 @@ class PRTouchEndstopWrapper:
         self.gcode.register_command('SELF_CHECK_PRTOUCH', self.cmd_SELF_CHECK_PRTOUCH, desc=self.cmd_SELF_CHECK_PRTOUCH_help)
         self.gcode.register_command('START_STEP_PRTOUCH', self.cmd_START_STEP_PRTOUCH, desc=self.cmd_START_STEP_PRTOUCH_help)
 
-        self.step_mcu.register_response(self._handle_step_debug_prtouch, "debug_prtouch", self.public_step_oid)
         self.step_mcu.register_response(self._handle_result_run_step_prtouch, "result_run_step_prtouch", self.public_step_oid)
-
-        self.pres_mcu.register_response(self._handle_pres_debug_prtouch, "debug_prtouch", self.public_pres_oid)
         self.pres_mcu.register_response(self._handle_result_run_pres_prtouch, "result_run_pres_prtouch", self.public_pres_oid)
         self.pres_mcu.register_response(self._handle_result_read_pres_prtouch, "result_read_pres_prtouch", self.public_pres_oid)
 
@@ -237,9 +231,6 @@ class PRTouchEndstopWrapper:
 
         self.manual_get_pres_cmd = self.pres_mcu.lookup_query_command('manual_get_pres oid=%c index=%c', 'resault_manual_get_pres oid=%c index=%c tri_time=%u tri_chs=%c buf_cnt=%u tick_0=%u ch0_0=%i ch1_0=%i ch2_0=%i ch3_0=%i tick_1=%u ch0_1=%i ch1_1=%i ch2_1=%i ch3_1=%i', oid=self.public_pres_oid)
 
-    def _handle_step_debug_prtouch(self, params):
-        self.ver_step = 'V' + str(params['version'] / 100)
-
     def _handle_result_run_step_prtouch(self, params):
         self.step_tri_time = params['tri_time'] / 10000.
         for i in range(4):
@@ -250,9 +241,6 @@ class PRTouchEndstopWrapper:
             self.safe_move_z_tri_call_back(run_dis)
             self.safe_move_z_tri_call_back = None
             self._print_msg('SAFE_MOVE_Z', 'tri_dis = %f' % run_dis, True)
-
-    def _handle_pres_debug_prtouch(self, params):
-        self.ver_pres = 'V' + str(params['version'] / 100)
 
     def _handle_result_run_pres_prtouch(self, params):
         self.pres_tri_time = params['tri_time'] / 10000.
@@ -948,26 +936,6 @@ class PRTouchEndstopWrapper:
             self._set_fan_speed('heater_fan', self.fan_heat_max_spd)
         self._set_step_par(load_sys=True)
         self.bed_mesh.set_mesh(mesh)
-
-    cmd_READ_PRES_help = "Read The Press Vals."
-    def cmd_READ_PRES(self, gcmd):
-        self._print_msg('VERSION', 'ARM(PRTH)=%s, MCU(PRES)=%s, MCU(STEP)=%s' % (self.ver_prth, self.ver_pres, self.ver_step))
-        self.pres_res = []
-        read_cnt = gcmd.get_int('C', 1)
-        self.read_pres_prtouch_cmd.send([self.public_pres_oid, self.tri_acq_ms, read_cnt])
-        start_tick_s = time.time()
-        while ((time.time() - start_tick_s) < (1.5 * (self.tri_acq_ms / 1000.) * read_cnt)) and len(self.pres_res) < read_cnt:
-            self._delay_s(0.010)
-        pnt_vals = [[], [], [], []]
-        pnt_tick = []
-        for i in range(len(self.pres_res)):
-            pnt_tick.append(self.pres_res[i]['tick'] / 10000.)
-            for j in range(self.pres_cnt):
-                pnt_vals[j].append(self.pres_res[i]['ch%d' % j])
-
-        self._print_ary('READ_PRES_TICKS', pnt_tick, len(pnt_tick), 3, True)
-        for i in range(self.pres_cnt):
-            self._print_ary('READ_PRES_CH%d' % i, pnt_vals[i], len(pnt_vals[i]), 0, True)
 
     cmd_TEST_SWAP_help = "Test The Swap Pin."
     def cmd_TEST_SWAP(self, gcmd):
