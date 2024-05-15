@@ -247,7 +247,7 @@ class PRTouchEndstopWrapper:
         for i in range(4):
             sdir = {'tick': params['tick%d' % i] / 10000., 'step': params['step%d' % i], 'index': params['index']}
             self.step_res.append(sdir)
-        if self.safe_move_z_tri_call_back != None and len(self.step_res) == MAX_BUF_LEN:
+        if self.safe_move_z_tri_call_back is not None and len(self.step_res) == MAX_BUF_LEN:
             run_dis = (self.safe_move_z_all_cnt - self.step_res[-1]['step']) * self.mm_per_step
             self.safe_move_z_tri_call_back(run_dis)
             self.safe_move_z_tri_call_back = None
