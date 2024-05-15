@@ -518,7 +518,7 @@ class PRTouchEndstopWrapper:
 
                 rc = 1. / 2. / math.pi / self.cal_hftr_cut
                 coff = rc / (rc + 1. / (1000 / self.tri_acq_ms))
-                _pres_d_buf = [p for p in pres_d_buf]
+                _pres_d_buf = list(pres_d_buf)
                 pres_d_buf = [0]
 
                 for i in range(1, len(_pres_d_buf)):
@@ -529,7 +529,7 @@ class PRTouchEndstopWrapper:
             self.print_ary('CAL_TRI_DATA_FILTER_CH%d' % valid_ch, pres_d_buf, len(pres_d_buf), 0)
 
             # 5. Cal The Pres Tri Index And Tick
-            vals_p = [x for x in pres_d_buf]
+            vals_p = list(pres_d_buf)
             min_val, max_val = min(vals_p), max(vals_p)
             for i in range(len(vals_p)):
                 vals_p[i] = (vals_p[i] - min_val) / (max_val - min_val)
@@ -724,7 +724,7 @@ class PRTouchEndstopWrapper:
             self.ck_and_manual_get_pres()
             tri_base_radio += (0 if (self.pres_buf_cnt >= (MAX_BUF_LEN / 2) or self.use_adc) else 0.25)
             self.print_msg('RUN_STEP_PRTOUCH', 'pres_buf_cnt = %d, tri_base_radio = %f' % (self.pres_buf_cnt, tri_base_radio))
-            step_par_down, pres_par_down = [x for x in self.step_res], [x for x in self.pres_res]
+            step_par_down, pres_par_down = list(self.step_res), list(self.pres_res)
             res_z.append(self.cal_tri_data(step_cnt_down, now_pos[2], step_par_down, pres_par_down, -lost_min_cnt * self.mm_per_step))
 
             can_rt = True if (i == 1 and not self.use_adc and math.fabs(res_z[0] - res_z[1]) < 0.05 and crt_cnt != pro_cnt) else False
@@ -911,7 +911,7 @@ class PRTouchEndstopWrapper:
             out_mms.append(math.fabs(out_mm))
             if len(out_mms) > 3:
                 del out_mms[0]
-            _out_mms = [m for m in out_mms]
+            _out_mms = list(out_mms)
             _out_mms.sort()
             self.print_ary('G28_FIRST_MMS', _out_mms, len(_out_mms), 3)
             if len(_out_mms) == 3 and (_out_mms[0] + _out_mms[1] < 2.0):
