@@ -117,7 +117,7 @@ class PrinterProbe:
             y_offset = self.printer.lookup_object('laser').cfg.y_offset
             return x_offset, y_offset, self.z_offset
         return self.x_offset, self.y_offset, self.z_offset
-    def _probe(self, speed, number=None):
+    def _probe(self, speed):
         toolhead = self.printer.lookup_object('toolhead')
         curtime = self.printer.get_reactor().monotonic()
         if 'z' not in toolhead.get_status(curtime)['homed_axes']:
@@ -143,12 +143,8 @@ class PrinterProbe:
                 axis_twist_compensation.get_z_compensation_value(pos))
         # add z compensation to probe position
         epos[2] += z_compensation
-        if number:
-            self.gcode.respond_info("auto_bed_level %d,%.3f,%.3f, %.3f"
-                                    % (number, epos[0], epos[1], epos[2] - self.z_offset))
-        else:
-            self.gcode.respond_info("probe at %.3f,%.3f is z=%.6f"
-                                    % (epos[0], epos[1], epos[2] - self.z_offset))
+        self.gcode.respond_info("probe at %.3f,%.3f is z=%.6f"
+                                % (epos[0], epos[1], epos[2]))
         return epos[:3]
     def _move(self, coord, speed):
         self.printer.lookup_object('toolhead').manual_move(coord, speed)
@@ -164,7 +160,7 @@ class PrinterProbe:
             return z_sorted[middle]
         # even number of samples
         return self._calc_mean(z_sorted[middle-1:middle+1])
-    def run_probe(self, gcmd, number=None):
+    def run_probe(self, gcmd):
         speed = gcmd.get_float("PROBE_SPEED", self.speed, above=0.)
         lift_speed = self.get_lift_speed(gcmd)
         sample_count = gcmd.get_int("SAMPLES", self.sample_count, minval=1)
@@ -183,7 +179,7 @@ class PrinterProbe:
         positions = []
         while len(positions) < sample_count:
             # Probe position
-            pos = self._probe(speed, number)
+            pos = self._probe(speed)
             positions.append(pos)
             # Check samples tolerance
             z_positions = [p[2] for p in positions]
@@ -455,7 +451,7 @@ class ProbePointsHelper:
             done = self._move_next()
             if done:
                 break
-            pos = probe.run_probe(gcmd, len(self.results) + 1)
+            pos = probe.run_probe(gcmd)
             self.results.append(pos)
         probe.multi_probe_end()
     def _manual_probe_start(self):
