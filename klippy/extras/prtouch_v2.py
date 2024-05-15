@@ -250,7 +250,7 @@ class PRTouchEndstopWrapper:
             run_dis = (self.safe_move_z_all_cnt - self.step_res[-1]['step']) * self.mm_per_step
             self.safe_move_z_tri_call_back(run_dis)
             self.safe_move_z_tri_call_back = None
-            self.print_msg('SAFE_MOVE_Z', 'tri_dis = %f' % run_dis, True)
+            self._print_msg('SAFE_MOVE_Z', 'tri_dis = %f' % run_dis, True)
 
     def _handle_pres_debug_prtouch(self, params):
         self.ver_pres = 'V' + str(params['version'] / 100)
@@ -266,27 +266,27 @@ class PRTouchEndstopWrapper:
     def _handle_result_read_pres_prtouch(self, params):
         self.pres_res.append(params)
 
-    def print_msg(self, title, msg, force=False):
+    def _print_msg(self, title, msg, force=False):
         logging.info('[%s] %s' , title, msg)
         if force and title != 'SHOW_WAVE':
             self.gcode.respond_info('[' + title + ']' + msg)
 
-    def print_ary(self, title, ary, lent=32, pt_cnt=2, force=False):
+    def _print_ary(self, title, ary, lent=32, pt_cnt=2, force=False):
         st = '['
         for i in range(len(ary) - lent, len(ary)):
             st = st + ("%." + ("%df, " % pt_cnt)) % (ary[i])
         st += ']'
         logging.info('[%s] %s' , title, st)
         if force:
-            self.print_msg(title, st, force)
+            self._print_msg(title, st, force)
 
-    def print_res(self):
+    def _print_res(self):
         t_buf, p_buf = [], []
         for i in range(len(self.step_res)):
             t_buf.append(self.step_res[i]['tick'])
             p_buf.append(self.step_res[i]['step'])
-        self.print_ary('STEP_TICK', t_buf, len(t_buf))
-        self.print_ary('STEP_DATA', p_buf, len(p_buf))
+        self._print_ary('STEP_TICK', t_buf, len(t_buf))
+        self._print_ary('STEP_DATA', p_buf, len(p_buf))
 
         t_buf, p_buf = [], [[], [], [], []]
         for i in range(len(self.pres_res)):
@@ -294,12 +294,12 @@ class PRTouchEndstopWrapper:
             for j in range(self.pres_cnt):
                 p_buf[j].append(self.pres_res[i]['ch%d' % j])
 
-        self.print_ary('PRES_TICK', t_buf, len(t_buf))
+        self._print_ary('PRES_TICK', t_buf, len(t_buf))
         for i in range(self.pres_cnt):
-            self.send_wave_tri(i, p_buf[i])
-            self.print_ary('PRES_CH%d' % i, p_buf[i], len(p_buf[i]))
+            self._send_wave_tri(i, p_buf[i])
+            self._print_ary('PRES_CH%d' % i, p_buf[i], len(p_buf[i]))
 
-    def ck_and_raise_error(self, ck, err, vals=[]):
+    def _ck_and_raise_error(self, ck, err, vals=[]):
         if not ck:
             return
         self.enable_steps()
@@ -308,37 +308,37 @@ class PRTouchEndstopWrapper:
         self.start_step_prtouch_cmd.send([self.step_oid, 1, self.tri_send_ms, step_cnt, step_us, acc_ctl_cnt, self.low_spd_nul, self.send_step_duty, 0])
         t_last = time.time()
         while (time.time() - t_last < 20) and (len(self.step_res) != MAX_BUF_LEN):
-            self.delay_s(0.010)
+            self._delay_s(0.010)
         self.start_step_prtouch_cmd.send([self.step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
         self.toolhead.set_position(now_pos[:2] + [0, now_pos[3]], homing_axes=[2])
 
         self.disable_steps()
         msg = err % tuple(vals)
-        self.print_msg('RAISE_ERROR', msg, True)
+        self._print_msg('RAISE_ERROR', msg, True)
         shutdown_msg = 'Shutdown due to ' + msg
         self.printer.invoke_shutdown(shutdown_msg)
         raise self.printer.command_error(shutdown_msg)
 
-    def send_wave_tri(self, ch, ary):
+    def _send_wave_tri(self, ch, ary):
         msg = '%d' % ch
         for i in range(len(ary)):
             msg += ',%d' % ary[i]
-        self.print_msg('SHOW_WAVE', msg)
+        self._print_msg('SHOW_WAVE', msg)
 
-    def delay_s(self, delay_s):
+    def _delay_s(self, delay_s):
         reactor = self.printer.get_reactor()
         eventtime = reactor.monotonic()
         if not self.printer.is_shutdown():
             self.toolhead.get_last_move_time()
             eventtime = reactor.pause(eventtime + delay_s)
 
-    def ck_g28ed(self):
+    def _ck_g28ed(self):
         for i in range(3):
             if self.toolhead.kin.limits[i][0] > self.toolhead.kin.limits[i][1]:
                 self.gcode.run_script_from_command('G28')
                 break
 
-    def set_step_par(self, load_sys=True):
+    def _set_step_par(self, load_sys=True):
         if load_sys:
             self.toolhead.max_velocity = self.sys_max_velocity
             self.toolhead.max_accel = self.sys_max_accel
@@ -359,7 +359,7 @@ class PRTouchEndstopWrapper:
             self.has_save_sys_acc = True
 
     def enable_steps(self):
-        self.print_msg('ENABLE_STEPS', 'Start enable_steps()...')
+        self._print_msg('ENABLE_STEPS', 'Start enable_steps()...')
         for stepper in self.toolhead.get_kinematics().get_steppers():
             print_time = self.toolhead.get_last_move_time()
             stepper_enable = self.printer.lookup_object('stepper_enable')
@@ -368,10 +368,10 @@ class PRTouchEndstopWrapper:
             if not was_enable:
                 enable.motor_enable(print_time)
                 self.toolhead.dwell(0.100)
-                self.delay_s(0.5)
+                self._delay_s(0.5)
 
     def disable_steps(self):
-        self.print_msg('DISABLE_STEPS', 'Start disable_steps()...')
+        self._print_msg('DISABLE_STEPS', 'Start disable_steps()...')
         for stepper in self.toolhead.get_kinematics().get_steppers():
             print_time = self.toolhead.get_last_move_time()
             stepper_enable = self.printer.lookup_object('stepper_enable')
@@ -380,19 +380,19 @@ class PRTouchEndstopWrapper:
             if was_enable:
                 enable.motor_disable(print_time)
                 self.toolhead.dwell(0.100)
-                self.delay_s(0.5)
+                self._delay_s(0.5)
 
     def move(self, pos, speed, wait=True):
 
         if not self.shut_down:
             gcmd = 'G1 F%d X%.3f Y%.3f Z%.3f' % (speed * 60, pos[0], pos[1], pos[2]) if len(pos) >= 3 else 'G1 F%d X%.3f Y%.3f' % (speed * 60, pos[0], pos[1])
-            self.print_msg('PRTOUCH_MOVE', 'Start Move, gcmd=' + gcmd)
+            self._print_msg('PRTOUCH_MOVE', 'Start Move, gcmd=' + gcmd)
             self.gcode.run_script_from_command(gcmd)
             if wait:
                 self.toolhead.wait_moves()
 
-    def set_fan_speed(self, fan_name='None', fan_spd=0.):
-        self.print_msg('SET_FAN_SPEED', 'fan_name=%s, fan_spd=%f' % (fan_name, fan_spd))
+    def _set_fan_speed(self, fan_name='None', fan_spd=0.):
+        self._print_msg('SET_FAN_SPEED', 'fan_name=%s, fan_spd=%f' % (fan_name, fan_spd))
         if fan_name == 'heater_fan':
             for key in self.printer.objects:
                 if 'heater_fan' in key:
@@ -405,22 +405,22 @@ class PRTouchEndstopWrapper:
             else:
                 self.gcode.run_script_from_command('M106 P0 S%d' % (fan_spd * 255))
 
-    def set_hot_temps(self, temp, wait=False, err=5):
-        self.print_msg('SET_HOT_TEMPS', 'temp=%.2f, wait=%d, err=%f'% (temp, wait, err))
+    def _set_hot_temps(self, temp, wait=False, err=5):
+        self._print_msg('SET_HOT_TEMPS', 'temp=%.2f, wait=%d, err=%f'% (temp, wait, err))
         self.pheaters.set_temperature(self.heater_hot, temp, False)
         if wait:
             while not self.shut_down and abs(self.heater_hot.target_temp - self.heater_hot.smoothed_temp) > err and self.heater_hot.target_temp > 0:
-                self.delay_s(0.100)
+                self._delay_s(0.100)
 
-    def set_bed_temps(self, temp, wait=False, err=5):
-        self.print_msg('SET_BED_TEMPS', 'temp=%.2f, wait=%d, err=%f'% (temp, wait, err))
+    def _set_bed_temps(self, temp, wait=False, err=5):
+        self._print_msg('SET_BED_TEMPS', 'temp=%.2f, wait=%d, err=%f'% (temp, wait, err))
         self.pheaters.set_temperature(self.heater_bed, temp, False)
         if wait:
             while not self.shut_down and abs(self.heater_bed.target_temp - self.heater_bed.smoothed_temp) > err and self.heater_bed.target_temp > 0:
-                self.delay_s(0.100)
+                self._delay_s(0.100)
 
-    def shake_motor(self, cnt):
-        self.print_msg('SHAKE_MOTOR', 'cnt=%d' % cnt)
+    def _shake_motor(self, cnt):
+        self._print_msg('SHAKE_MOTOR', 'cnt=%d' % cnt)
         now_pos = self.toolhead.get_position()
         max_z_velocity = self.toolhead.kin.max_z_velocity
         for _ in range(int(cnt / 2)):
@@ -429,37 +429,37 @@ class PRTouchEndstopWrapper:
             self.gcode.run_script_from_command('G1 X%.2f Y%.2f Z%.2f F%d' % (now_pos[0] + self.shake_range, now_pos[1] + self.shake_range, now_pos[2] - self.shake_range / 2, int(60 * max_z_velocity * 0.25)))
             self.gcode.run_script_from_command('G1 X%.2f Y%.2f Z%.2f F%d' % (now_pos[0] - self.shake_range, now_pos[1] + self.shake_range, now_pos[2] + self.shake_range / 2, int(60 * max_z_velocity * 0.25)))
             while len(self.toolhead.move_queue.queue) >= 5:
-                self.delay_s(0.010)
+                self._delay_s(0.010)
         self.move(now_pos, self.rdy_z_spd)
 
-    def ck_and_manual_get_step(self):
+    def _ck_and_manual_get_step(self):
         if len(self.step_res) == MAX_BUF_LEN:
             return
-        self.ck_and_raise_error(len(self.step_res) < MAX_BUF_LEN / 4, ERR_STEP_LOST_RUN_DATA, [len(self.step_res)])
-        self.print_msg('CK_AND_MANUAL_GET_STEP', 'need=%d, recv=%d' % (MAX_BUF_LEN, len(self.step_res)))
+        self._ck_and_raise_error(len(self.step_res) < MAX_BUF_LEN / 4, ERR_STEP_LOST_RUN_DATA, [len(self.step_res)])
+        self._print_msg('CK_AND_MANUAL_GET_STEP', 'need=%d, recv=%d' % (MAX_BUF_LEN, len(self.step_res)))
 
         for i in range(0, MAX_BUF_LEN, 4):
             if len(self.step_res) > i and self.step_res[i]['index'] == i:
                 continue
-            self.print_msg('CK_AND_MANUAL_GET_STEP', 'Re trans index=%d' % i)
+            self._print_msg('CK_AND_MANUAL_GET_STEP', 'Re trans index=%d' % i)
             params = self.manual_get_steps_cmd.send([self.step_oid, i])
             self.step_tri_time = params['tri_time'] / 10000.
             for j in range(4):
                 sdir = {'tick': params['tick%d' % j] / 10000., 'step': params['step%d' % j], 'index': params['index']}
                 self.step_res.insert(i + j, sdir)
 
-        self.ck_and_raise_error(len(self.step_res) != MAX_BUF_LEN, ERR_STEP_LOST_RUN_DATA, [len(self.step_res)])
+        self._ck_and_raise_error(len(self.step_res) != MAX_BUF_LEN, ERR_STEP_LOST_RUN_DATA, [len(self.step_res)])
 
-    def ck_and_manual_get_pres(self):
+    def _ck_and_manual_get_pres(self):
         if len(self.pres_res) == MAX_BUF_LEN:
             return
-        self.ck_and_raise_error(len(self.pres_res) < MAX_BUF_LEN / 4, ERR_PRES_LOST_RUN_DATA, [len(self.pres_res)])
+        self._ck_and_raise_error(len(self.pres_res) < MAX_BUF_LEN / 4, ERR_PRES_LOST_RUN_DATA, [len(self.pres_res)])
 
-        self.print_msg('CK_AND_MANUAL_GET_PRES', 'need=%d, recv=%d' % (MAX_BUF_LEN, len(self.pres_res)))
+        self._print_msg('CK_AND_MANUAL_GET_PRES', 'need=%d, recv=%d' % (MAX_BUF_LEN, len(self.pres_res)))
         for i in range(0, MAX_BUF_LEN, 2):
             if len(self.pres_res) > i and self.pres_res[i]['index'] == i:
                 continue
-            self.print_msg('CK_AND_MANUAL_GET_PRES', 'Re trans index=%d' % i)
+            self._print_msg('CK_AND_MANUAL_GET_PRES', 'Re trans index=%d' % i)
             params = self.manual_get_pres_cmd.send([self.step_oid, i])
             self.pres_tri_time = params['tri_time'] / 10000.
             self.pres_tri_chs = params['tri_chs']
@@ -468,9 +468,9 @@ class PRTouchEndstopWrapper:
                 rdir = {'tick':params['tick_%d' % j] / 10000., 'ch0': params['ch0_%d' % j], 'ch1': params['ch1_%d' % j], 'ch2': params['ch2_%d' % j], 'ch3': params['ch3_%d' % j], 'index': params['index']}
                 self.pres_res.insert(i + j, rdir)
 
-        self.ck_and_raise_error(len(self.pres_res) != MAX_BUF_LEN, ERR_PRES_LOST_RUN_DATA, [len(self.pres_res)])
+        self._ck_and_raise_error(len(self.pres_res) != MAX_BUF_LEN, ERR_PRES_LOST_RUN_DATA, [len(self.pres_res)])
 
-    def get_valid_ch(self):
+    def _get_valid_ch(self):
         now_pos = self.toolhead.get_position()
         min_x, min_y = self.bed_mesh.bmc.mesh_min
         max_x, max_y = self.bed_mesh.bmc.mesh_max
@@ -480,16 +480,16 @@ class PRTouchEndstopWrapper:
         l_chs.append(math.sqrt((now_pos[0] - min_x) ** 2 + (now_pos[1] - max_y) ** 2) if (self.pres_tri_chs & 0x04) else max_x * max_y * 2)
         l_chs.append(math.sqrt((now_pos[0] - max_y) ** 2 + (now_pos[1] - max_y) ** 2) if (self.pres_tri_chs & 0x08) else max_x * max_y * 2)
         valid_ch = l_chs.index(min(l_chs))
-        self.print_msg('VALID_CH', 'Tri_mark=%d best_ch=%d Chs=' % (self.pres_tri_chs, valid_ch) + '  ' + str(l_chs))
+        self._print_msg('VALID_CH', 'Tri_mark=%d best_ch=%d Chs=' % (self.pres_tri_chs, valid_ch) + '  ' + str(l_chs))
         return l_chs
 
-    def cal_tri_data(self, start_step, start_pos_z, step_res, pres_res, oft_z=0):
+    def _cal_tri_data(self, start_step, start_pos_z, step_res, pres_res, oft_z=0):
 
         # 0. Send Debut Msg.
-        self.print_res()
+        self._print_res()
         # 1. Get Best Tri Ch
         max_x, max_y = self.bed_mesh.bmc.mesh_max
-        l_chs = self.get_valid_ch()
+        l_chs = self._get_valid_ch()
         out_mms = []
         for valid_ch in range(len(l_chs)):
             if l_chs[valid_ch] == max_x * max_y * 2:
@@ -522,7 +522,7 @@ class PRTouchEndstopWrapper:
 
             for i in range(1, len(pres_d_buf)):
                 pres_d_buf[i] = pres_d_buf[i - 1] * (1 - self.cal_lftr_k1) + pres_d_buf[i] * self.cal_lftr_k1
-            self.print_ary('CAL_TRI_DATA_FILTER_CH%d' % valid_ch, pres_d_buf, len(pres_d_buf), 0)
+            self._print_ary('CAL_TRI_DATA_FILTER_CH%d' % valid_ch, pres_d_buf, len(pres_d_buf), 0)
 
             # 5. Cal The Pres Tri Index And Tick
             vals_p = list(pres_d_buf)
@@ -547,11 +547,11 @@ class PRTouchEndstopWrapper:
             if 0 < step_tri_index < len(step_res) - 1:
                 out_step = step_d_buf[step_tri_index] + (step_d_buf[step_tri_index + 1] - step_d_buf[step_tri_index]) * (pres_tri_tick - step_tri_tick) / (step_t_buf[step_tri_index + 1] - step_t_buf[step_tri_index])
             out_val_mm = start_pos_z - (start_step - out_step) * self.mm_per_step + oft_z
-            self.print_msg('TRI_PRES_MSG', 'start_pres=%d, tri_pres=%d, end_pres=%d, pres_tri_index=%d, pres_tri_tick=%.3f' % (pres_d_buf[0], pres_d_buf[pres_tri_index], pres_d_buf[-1], pres_tri_index, pres_tri_tick))
-            self.print_msg('TRI_STEP_MSG', 'start_step=%d, tri_step=%d, end_step=%d, step_tri_index=%d, step_tri_tick=%.3f' % (start_step,    out_step,                   step_d_buf[-1], step_tri_index, step_tri_tick))
-            self.print_msg('TRI_OUT_MM', 'mm_pre_step=%f, out_mm=%f' % (self.mm_per_step, out_val_mm))
+            self._print_msg('TRI_PRES_MSG', 'start_pres=%d, tri_pres=%d, end_pres=%d, pres_tri_index=%d, pres_tri_tick=%.3f' % (pres_d_buf[0], pres_d_buf[pres_tri_index], pres_d_buf[-1], pres_tri_index, pres_tri_tick))
+            self._print_msg('TRI_STEP_MSG', 'start_step=%d, tri_step=%d, end_step=%d, step_tri_index=%d, step_tri_tick=%.3f' % (start_step,    out_step,                   step_d_buf[-1], step_tri_index, step_tri_tick))
+            self._print_msg('TRI_OUT_MM', 'mm_pre_step=%f, out_mm=%f' % (self.mm_per_step, out_val_mm))
             out_mms.append(out_val_mm)
-        self.print_ary('OUT_MMS', out_mms, len(out_mms), 2)
+        self._print_ary('OUT_MMS', out_mms, len(out_mms), 2)
         return sum(out_mms) / len(out_mms) # out_val_mm
 
     def get_step_cnts(self, run_dis, run_spd):
@@ -560,7 +560,7 @@ class PRTouchEndstopWrapper:
         step_cnt = int(run_dis / self.mm_per_step)
         step_us = int(((run_dis / run_spd) * 1000 * 1000) / step_cnt)
         acc_ctl_cnt = int(self.acc_ctl_mm / self.mm_per_step)
-        self.print_msg('GET_STEP_CNTS', 'run_dis=%.2f, run_spd=%.2f, step_cnt=%d, step_us=%d acc_ctl_cnt=%d' % (run_dis, run_spd, step_cnt, step_us, acc_ctl_cnt))
+        self._print_msg('GET_STEP_CNTS', 'run_dis=%.2f, run_spd=%.2f, step_cnt=%d, step_us=%d acc_ctl_cnt=%d' % (run_dis, run_spd, step_cnt, step_us, acc_ctl_cnt))
         return step_cnt, step_us, acc_ctl_cnt
 
     def get_mm_per_step(self):
@@ -569,17 +569,17 @@ class PRTouchEndstopWrapper:
         for stepper in self.toolhead.get_kinematics().get_steppers():
             if stepper.is_active_axis('z'):
                 self.mm_per_step = self.step_base * stepper.get_step_dist()
-                self.print_msg('GET_MM_PER_STEP', str(stepper.get_step_dist()))
+                self._print_msg('GET_MM_PER_STEP', str(stepper.get_step_dist()))
 
-    def env_self_check(self, force=False):
+    def _env_self_check(self, force=False):
         # 1. PR_ERR_CODE_SWAP_PIN_DETECTI
         self.write_swap_prtouch_cmd.send([self.pres_oid, 0])
         params0 = self.read_swap_prtouch_cmd.send([self.step_oid])
         self.write_swap_prtouch_cmd.send([self.pres_oid, 1])
         params1 = self.read_swap_prtouch_cmd.send([self.step_oid])
-        self.ck_and_raise_error(not params0 or not params1 or params0['sta'] != 0 or params1['sta'] != 1,
+        self._ck_and_raise_error(not params0 or not params1 or params0['sta'] != 0 or params1['sta'] != 1,
                                 ERR_SWAP_PIN_DETECTI, [self.pres_swap_pin, self.step_swap_pin])
-        self.print_msg('DEBUG', '--Self Test 1 = PR_ERR_CODE_SWAP_PIN_DETECTI, Pass!!--', force)
+        self._print_msg('DEBUG', '--Self Test 1 = PR_ERR_CODE_SWAP_PIN_DETECTI, Pass!!--', force)
 
         if not self.need_self_check and not force:
             return
@@ -590,9 +590,9 @@ class PRTouchEndstopWrapper:
         self.read_pres_prtouch_cmd.send([self.pres_oid, self.tri_acq_ms, 32 + 8])
         start_tick_s = time.time()
         while ((time.time() - start_tick_s) < (1.5 * (self.tri_acq_ms / 1000.) * 64)) and len(self.pres_res) < 32:
-            self.delay_s(0.010)
+            self._delay_s(0.010)
         self.read_pres_prtouch_cmd.send([self.pres_oid, self.tri_acq_ms, 0])
-        self.ck_and_raise_error(len(self.pres_res) < 32, ERR_PRES_READ_DATA_TIMEOUT, [32, len(self.pres_res)])
+        self._ck_and_raise_error(len(self.pres_res) < 32, ERR_PRES_READ_DATA_TIMEOUT, [32, len(self.pres_res)])
 
         pnt_tick, pnt_vals = [], [[], [], [], []]
         for i in range(4, len(self.pres_res) - 4):
@@ -602,10 +602,10 @@ class PRTouchEndstopWrapper:
         tr = 0
         for i in range(1, len(pnt_tick)):
             tr += pnt_tick[i] - pnt_tick[i - 1]
-        self.print_msg('SELF_CHECK_TICK', str(pnt_tick))
-        self.print_msg('SELF_CHECK_DATA', str(pnt_vals))
-        self.ck_and_raise_error(tr / (len(pnt_tick) - 1) > 2 * self.tri_acq_ms, ERR_PRES_READ_DATA_TIMEOUT, [self.tri_acq_ms, tr / (len(pnt_tick) - 1)])
-        self.print_msg('DEBUG', '--Self Test 2 = PR_ERR_CODE_PRES_READ_DATA_TIMEOUT, Pass!!--', force)
+        self._print_msg('SELF_CHECK_TICK', str(pnt_tick))
+        self._print_msg('SELF_CHECK_DATA', str(pnt_vals))
+        self._ck_and_raise_error(tr / (len(pnt_tick) - 1) > 2 * self.tri_acq_ms, ERR_PRES_READ_DATA_TIMEOUT, [self.tri_acq_ms, tr / (len(pnt_tick) - 1)])
+        self._print_msg('DEBUG', '--Self Test 2 = PR_ERR_CODE_PRES_READ_DATA_TIMEOUT, Pass!!--', force)
 
         # 3. PR_ERR_CODE_PRES_VAL_IS_CONSTANT
         for i in range(self.pres_cnt):
@@ -613,16 +613,16 @@ class PRTouchEndstopWrapper:
             for j in range(len(pnt_vals[i])):
                 pnt_vals[i][j] -= avg
                 sums += math.fabs(pnt_vals[i][j])
-            self.ck_and_raise_error(not sums, ERR_PRES_VAL_IS_CONSTANT)
-        self.print_msg('DEBUG', '--Self Test 3 = PR_ERR_CODE_PRES_VAL_IS_CONSTANT, Pass!!--', force)
+            self._ck_and_raise_error(not sums, ERR_PRES_VAL_IS_CONSTANT)
+        self._print_msg('DEBUG', '--Self Test 3 = PR_ERR_CODE_PRES_VAL_IS_CONSTANT, Pass!!--', force)
 
         # 4. PR_ERR_CODE_PRES_NOISE_TOO_BIG
         for i in range(self.pres_cnt):
             big_cnt = 0
             for j in range(len(pnt_vals[i])):
                 big_cnt += (1 if math.fabs(pnt_vals[i][j]) > (self.tri_min_hold if not self.use_adc else 200) else 0)
-            self.ck_and_raise_error(big_cnt > len(pnt_vals[i]) / 2, ERR_PRES_NOISE_TOO_BIG)
-        self.print_msg('DEBUG', '--Self Test 4 = PR_ERR_CODE_PRES_NOISE_TOO_BIG, Pass!!--', force=force)
+            self._ck_and_raise_error(big_cnt > len(pnt_vals[i]) / 2, ERR_PRES_NOISE_TOO_BIG)
+        self._print_msg('DEBUG', '--Self Test 4 = PR_ERR_CODE_PRES_NOISE_TOO_BIG, Pass!!--', force=force)
 
         # 4. PR_ERR_CODE_PRES_NOT_BE_SENSED
         self.enable_steps()
@@ -631,11 +631,11 @@ class PRTouchEndstopWrapper:
         self.toolhead.set_position(now_pos[:2] + [0, now_pos[3]], homing_axes=[2])
         self.pres_res = []
         self.read_pres_prtouch_cmd.send([self.pres_oid, self.tri_acq_ms, 32 + 8])
-        self.shake_motor(self.shake_cnt)
+        self._shake_motor(self.shake_cnt)
         while ((time.time() - start_tick_s) < (1.5 * (self.tri_acq_ms / 1000.) * 64)) and len(self.pres_res) < 32:
-            self.delay_s(0.010)
+            self._delay_s(0.010)
         self.read_pres_prtouch_cmd.send([self.pres_oid, self.tri_acq_ms, 0])
-        self.ck_and_raise_error(len(self.pres_res) < 32, ERR_PRES_READ_DATA_TIMEOUT, [32, len(self.pres_res)])
+        self._ck_and_raise_error(len(self.pres_res) < 32, ERR_PRES_READ_DATA_TIMEOUT, [32, len(self.pres_res)])
         pnt_tick, pnt_vals = [], [[], [], [], []]
         for i in range(4, len(self.pres_res) - 4):
             pnt_tick.append(self.pres_res[i]['tick'] / 10000.)
@@ -645,28 +645,28 @@ class PRTouchEndstopWrapper:
             low_cnt = 0
             for j in range(len(pnt_vals[i])):
                 low_cnt += (1 if abs(pnt_vals[i][j]) < (200 if self.use_adc else 500) else 0)
-            self.ck_and_raise_error(low_cnt > len(pnt_vals[i]) / 2, ERR_PRES_NOT_BE_SENSED)
-        self.print_msg('DEBUG', '--Self Test 5 = PR_ERR_CODE_PRES_NOT_BE_SENSED, Pass!!--', force)
+            self._ck_and_raise_error(low_cnt > len(pnt_vals[i]) / 2, ERR_PRES_NOT_BE_SENSED)
+        self._print_msg('DEBUG', '--Self Test 5 = PR_ERR_CODE_PRES_NOT_BE_SENSED, Pass!!--', force)
 
-    def probe_ready(self):
-        self.print_msg('PROBE_READY', 'Start probe_ready()...')
+    def _probe_ready(self):
+        self._print_msg('PROBE_READY', 'Start probe_ready()...')
         if self.jump_probe_ready:
             self.jump_probe_ready = False
             return False
-        self.ck_g28ed()
+        self._ck_g28ed()
         for i in range(len(self.rdy_pos)):
             self.rdy_pos[i][2] = self.bed_max_err
         now_pos = self.toolhead.get_position()
         self.move(now_pos[:2] + [self.bed_max_err, now_pos[3]], self.rdy_z_spd)
         for i in range(4):
-            self.print_msg('PROBE_READY', 'Start Probe Point=%s' % str(self.rdy_pos[i]))
+            self._print_msg('PROBE_READY', 'Start Probe Point=%s' % str(self.rdy_pos[i]))
             self.move(self.rdy_pos[i], self.rdy_xy_spd)
             self.rdy_pos[i][2] = self.run_step_prtouch(self.g29_down_min_z, self.probe_min_3err, True, 5, 3, True)
-        self.print_msg('RDY_POS', "[00=%.2f, 01=%.2f, 11=%.2f, 10=%.2f]" % (self.rdy_pos[0][2], self.rdy_pos[1][2], self.rdy_pos[2][2], self.rdy_pos[3][2]))
+        self._print_msg('RDY_POS', "[00=%.2f, 01=%.2f, 11=%.2f, 10=%.2f]" % (self.rdy_pos[0][2], self.rdy_pos[1][2], self.rdy_pos[2][2], self.rdy_pos[3][2]))
         return True
 
-    def safe_move_z(self, run_sta, run_dis, run_spd, run_rdo, tri_call_back = None):
-        self.print_msg('SAFE_MOVE_Z', 'run_sta=%d, run_dis=%f, run_spd=%f, run_rdo=%f' % (run_sta, run_dis, run_spd, run_rdo))
+    def _safe_move_z(self, run_sta, run_dis, run_spd, run_rdo, tri_call_back = None):
+        self._print_msg('SAFE_MOVE_Z', 'run_sta=%d, run_dis=%f, run_spd=%f, run_rdo=%f' % (run_sta, run_dis, run_spd, run_rdo))
         run_dir = 1 if run_dis > 0 else 0
         run_dis = math.fabs(run_dis)
 
@@ -700,7 +700,7 @@ class PRTouchEndstopWrapper:
         res_z = []
         now_pos = self.toolhead.get_position()
         lost_min_cnt = 0
-        self.print_msg('RUN_STEP_PRTOUCH', 'down_min_z=%f, probe_min_3err=%f, rt_last=%d, pro_cnt=%d, crt_cnt=%d, fast_probe=%d, tri_min_hold=%d, tri_max_hold=%d' %
+        self._print_msg('RUN_STEP_PRTOUCH', 'down_min_z=%f, probe_min_3err=%f, rt_last=%d, pro_cnt=%d, crt_cnt=%d, fast_probe=%d, tri_min_hold=%d, tri_max_hold=%d' %
                        (down_min_z, probe_min_3err, rt_last, pro_cnt, crt_cnt, fast_probe, tri_min_hold, tri_max_hold))
         for i in range(pro_cnt):
             self.step_res, self.pres_res = [], []
@@ -713,15 +713,15 @@ class PRTouchEndstopWrapper:
             self.start_step_prtouch_cmd.send([self.step_oid, 0, self.tri_send_ms, step_cnt_down, step_us_down, acc_ctl_cnt, self.low_spd_nul, self.send_step_duty, 0])
             t_last = time.time()
             while (time.time() - t_last < (down_min_z / self.tri_z_down_spd + 10)) and (len(self.step_res) != MAX_BUF_LEN or len(self.pres_res) != MAX_BUF_LEN):
-                self.delay_s(0.010)
+                self._delay_s(0.010)
             self.start_step_prtouch_cmd.send([self.step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
             self.start_pres_prtouch_cmd.send([self.pres_oid, 0, 0, 0, 0, 0, 0, 0, 0])
-            self.ck_and_manual_get_step()
-            self.ck_and_manual_get_pres()
+            self._ck_and_manual_get_step()
+            self._ck_and_manual_get_pres()
             tri_base_radio += (0 if (self.pres_buf_cnt >= (MAX_BUF_LEN / 2) or self.use_adc) else 0.25)
-            self.print_msg('RUN_STEP_PRTOUCH', 'pres_buf_cnt = %d, tri_base_radio = %f' % (self.pres_buf_cnt, tri_base_radio))
+            self._print_msg('RUN_STEP_PRTOUCH', 'pres_buf_cnt = %d, tri_base_radio = %f' % (self.pres_buf_cnt, tri_base_radio))
             step_par_down, pres_par_down = list(self.step_res), list(self.pres_res)
-            res_z.append(self.cal_tri_data(step_cnt_down, now_pos[2], step_par_down, pres_par_down, -lost_min_cnt * self.mm_per_step))
+            res_z.append(self._cal_tri_data(step_cnt_down, now_pos[2], step_par_down, pres_par_down, -lost_min_cnt * self.mm_per_step))
 
             can_rt = bool(i == 1 and not self.use_adc and math.fabs(res_z[0] - res_z[1]) < 0.05 and crt_cnt != pro_cnt)
             can_rt = True if (can_rt and tri_base_radio <= 1.0) else (i == (crt_cnt - 1)) and (max(res_z) - min(res_z) <= probe_min_3err)
@@ -742,28 +742,28 @@ class PRTouchEndstopWrapper:
             self.start_step_prtouch_cmd.send([self.step_oid, 1, self.tri_send_ms, step_cnt_up, step_us_up, acc_ctl_cnt, self.low_spd_nul, self.send_step_duty, 0])
             t_last = time.time()
             while (time.time() - t_last < (down_min_z / self.tri_z_down_spd + 5)) and (len(self.step_res) != MAX_BUF_LEN):
-                self.delay_s(0.010)
+                self._delay_s(0.010)
             self.start_step_prtouch_cmd.send([self.step_oid, 1, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
-            self.ck_and_manual_get_step()
+            self._ck_and_manual_get_step()
             if can_rt:
                 break
         res_z.sort()
-        self.print_ary('RES_Z', res_z, len(res_z))
+        self._print_ary('RES_Z', res_z, len(res_z))
         return res_z[int((len(res_z) - 1) / 2)] if len(res_z) != 2 else (res_z[0] + res_z[1]) / 2
 
-    def check_bed_mesh(self, auto_g29=True):
-        self.print_msg('CK_BED_MESH', 'Start check_bed_mesh()...')
-        self.ck_g28ed()
+    def _check_bed_mesh(self, auto_g29=True):
+        self._print_msg('CK_BED_MESH', 'Start check_bed_mesh()...')
+        self._ck_g28ed()
         _, min_y = self.bed_mesh.bmc.mesh_min
         _, max_y = self.bed_mesh.bmc.mesh_max
         mesh = self.bed_mesh.get_mesh()
         self.bed_mesh.set_mesh(None)
-        self.print_msg('CK_BED_MESH', 'Start probe_ready()...')
-        self.probe_ready()
+        self._print_msg('CK_BED_MESH', 'Start probe_ready()...')
+        self._probe_ready()
         self.jump_probe_ready = True
         if self.use_adc:
-            self.set_fan_speed('heater_fan', self.fan_heat_min_spd)
-        self.set_fan_speed('fan', 0.0)
+            self._set_fan_speed('heater_fan', self.fan_heat_min_spd)
+        self._set_fan_speed('fan', 0.0)
         if mesh:
             self.bed_mesh.set_mesh(mesh)
             err_cnt, errs = 0, []
@@ -772,18 +772,18 @@ class PRTouchEndstopWrapper:
                 mesh_z = self.bed_mesh.z_mesh.calc_z(self.rdy_pos[i][0], self.rdy_pos[i][1]) - self.noz_ex_com - ((1 - (self.rdy_pos[i][1] - min_y) / (max_y - min_y)) * (2 * self.tilt_corr_dis) - self.tilt_corr_dis)
                 errs.append(abs(self.rdy_pos[i][2] + self.gap_pos[i][2] - mesh_z))
                 err_cnt += (1 if errs[i] > self.check_bed_mesh_max_err else 0)
-                self.print_msg('CK_BED_MESH', 'P%d = [x=%.2f, y=%.2f, mest_z=%.2f, probe_z=%.2f, err_z=%.2f]' % (i, self.rdy_pos[i][0], self.rdy_pos[i][1], mesh_z, self.rdy_pos[i][2], errs[i]))
+                self._print_msg('CK_BED_MESH', 'P%d = [x=%.2f, y=%.2f, mest_z=%.2f, probe_z=%.2f, err_z=%.2f]' % (i, self.rdy_pos[i][0], self.rdy_pos[i][1], mesh_z, self.rdy_pos[i][2], errs[i]))
 
             save_version = 0 if not self.stored_profs else self.stored_profs.getint('version', default=0)
-            self.print_msg('CK_BED_MESH', 'Now Version=%d, Cfg Version=%d' % (PR_VERSION, save_version))
+            self._print_msg('CK_BED_MESH', 'Now Version=%d, Cfg Version=%d' % (PR_VERSION, save_version))
             err_cnt = err_cnt if save_version == PR_VERSION else 4
             if err_cnt < 2:
-                self.print_msg('DEBUG', "check_bed_mesh: Pass!!")
+                self._print_msg('DEBUG', "check_bed_mesh: Pass!!")
                 return
-            self.ck_and_raise_error(not auto_g29, ERR_CK_BED_MESH_OUT_RANGE, [[errs[0], errs[1],errs[2], errs[3]], self.check_bed_mesh_max_err])
-            self.print_msg('DEBUG', 'check_bed_mesh: Due to the great change of the hot bed or version, it needs to be re-leveled. ' + str([[errs[0], errs[1],errs[2], errs[3]], self.check_bed_mesh_max_err]))
+            self._ck_and_raise_error(not auto_g29, ERR_CK_BED_MESH_OUT_RANGE, [[errs[0], errs[1],errs[2], errs[3]], self.check_bed_mesh_max_err])
+            self._print_msg('DEBUG', 'check_bed_mesh: Due to the great change of the hot bed or version, it needs to be re-leveled. ' + str([[errs[0], errs[1],errs[2], errs[3]], self.check_bed_mesh_max_err]))
         if self.use_adc:
-            self.set_fan_speed('heater_fan', self.fan_heat_max_spd)
+            self._set_fan_speed('heater_fan', self.fan_heat_max_spd)
         self.gcode.run_script_from_command('BED_MESH_CALIBRATE')
 
         configfile = self.printer.lookup_object('configfile')
@@ -791,58 +791,58 @@ class PRTouchEndstopWrapper:
 
         self.gcode.run_script_from_command('SAVE_CONFIG')
 
-    def clear_nozzle(self, hot_min_temp, hot_max_temp, bed_max_temp):
-        self.print_msg('CLEAR_NOZZLE', 'Start clear_nozzle(), hot_min_temp=%.2f, hot_max_temp=%.2f, bed_max_temp=%.2f' % (hot_min_temp, hot_max_temp, bed_max_temp))
+    def _clear_nozzle(self, hot_min_temp, hot_max_temp, bed_max_temp):
+        self._print_msg('CLEAR_NOZZLE', 'Start clear_nozzle(), hot_min_temp=%.2f, hot_max_temp=%.2f, bed_max_temp=%.2f' % (hot_min_temp, hot_max_temp, bed_max_temp))
         min_x, min_y = self.clr_noz_start_x, self.clr_noz_start_y
-        self.set_bed_temps(temp=bed_max_temp, wait=False)
-        self.set_hot_temps(temp=hot_min_temp, wait=False, err=10)
-        self.ck_g28ed()
+        self._set_bed_temps(temp=bed_max_temp, wait=False)
+        self._set_hot_temps(temp=hot_min_temp, wait=False, err=10)
+        self._ck_g28ed()
         mesh = self.bed_mesh.get_mesh()
         self.bed_mesh.set_mesh(None)
-        self.set_step_par(load_sys=False)
+        self._set_step_par(load_sys=False)
         random.seed(time.time())
         cur_pos = self.toolhead.get_position()
         src_pos = [min_x + random.uniform(0, self.clr_noz_len_x - self.pa_clr_dis_mm - 5),
                    min_y + random.uniform(0, self.clr_noz_len_y), self.bed_max_err, cur_pos[3]]
         end_pos = [src_pos[0] + self.pa_clr_dis_mm, src_pos[1], src_pos[2], src_pos[3]]
-        self.set_hot_temps(temp=hot_min_temp, wait=True, err=10)
-        self.set_hot_temps(temp=hot_min_temp + 40, wait=False, err=10)
+        self._set_hot_temps(temp=hot_min_temp, wait=True, err=10)
+        self._set_hot_temps(temp=hot_min_temp + 40, wait=False, err=10)
 
-        self.print_msg('CLEAR_NOZZLE', 'Start Src Pos Probe...')
+        self._print_msg('CLEAR_NOZZLE', 'Start Src Pos Probe...')
         self.move([src_pos[0], src_pos[1], src_pos[2]], self.rdy_xy_spd)
         src_pos[2] = self.run_step_prtouch(self.g29_down_min_z, 0.1, False, 5, 3, True, self.tri_min_hold, self.tri_max_hold)
         if self.use_adc:
-            self.set_fan_speed('heater_fan', self.fan_heat_max_spd)
+            self._set_fan_speed('heater_fan', self.fan_heat_max_spd)
 
-        self.print_msg('CLEAR_NOZZLE', 'Start End Pos Probe...')
+        self._print_msg('CLEAR_NOZZLE', 'Start End Pos Probe...')
         self.move([end_pos[0], end_pos[1], end_pos[2]], self.rdy_xy_spd)
         if self.use_adc:
-            self.set_fan_speed('heater_fan', self.fan_heat_min_spd)
-        self.set_fan_speed('fan', 0.0)
+            self._set_fan_speed('heater_fan', self.fan_heat_min_spd)
+        self._set_fan_speed('fan', 0.0)
         end_pos[2] = self.run_step_prtouch(self.g29_down_min_z, 0.1, False, 5, 3, True, self.tri_min_hold, self.tri_max_hold)
 
-        self.print_msg('CLEAR_NOZZLE', 'Down And Wait Temp For %.2f...' % hot_max_temp)
+        self._print_msg('CLEAR_NOZZLE', 'Down And Wait Temp For %.2f...' % hot_max_temp)
         self.move([src_pos[0], src_pos[1], self.bed_max_err], self.rdy_xy_spd)
         self.move([src_pos[0], src_pos[1], src_pos[2] - self.pa_clr_down_mm], self.rdy_z_spd)
-        self.set_hot_temps(temp=hot_max_temp, wait=True, err=10)
+        self._set_hot_temps(temp=hot_max_temp, wait=True, err=10)
 
-        self.print_msg('CLEAR_NOZZLE', 'Start Clear The Noz...')
+        self._print_msg('CLEAR_NOZZLE', 'Start Clear The Noz...')
         self.move(end_pos[:2] + [end_pos[2] + self.pa_clr_down_mm], self.clr_xy_spd)
-        self.set_fan_speed('fan', 1.0)
+        self._set_fan_speed('fan', 1.0)
 
-        self.print_msg('CLEAR_NOZZLE', 'Start Cool Down The Noz...')
-        self.set_hot_temps(temp=hot_min_temp, wait=True, err=5)
+        self._print_msg('CLEAR_NOZZLE', 'Start Cool Down The Noz...')
+        self._set_hot_temps(temp=hot_min_temp, wait=True, err=5)
 
-        self.print_msg('CLEAR_NOZZLE', 'Start Finish Clear...')
+        self._print_msg('CLEAR_NOZZLE', 'Start Finish Clear...')
         self.move([end_pos[0] + self.pa_clr_dis_mm, end_pos[1], end_pos[2] + self.bed_max_err], self.clr_xy_spd)
-        self.set_fan_speed('fan', 0.)
-        self.set_bed_temps(temp=bed_max_temp, wait=True, err=5)
-        self.set_step_par(load_sys=True)
+        self._set_fan_speed('fan', 0.)
+        self._set_bed_temps(temp=bed_max_temp, wait=True, err=5)
+        self._set_step_par(load_sys=True)
         self.bed_mesh.set_mesh(mesh)
         self.gcode.run_script_from_command('G28 Z')
 
-    def run_G28_Z(self, accurate=True):
-        self.print_msg('RUN_G28_Z', 'Start run_G28_Z()...')
+    def _run_G28_Z(self, accurate=True):
+        self._print_msg('RUN_G28_Z', 'Start run_G28_Z()...')
         self.enable_steps()
         self.get_mm_per_step()
         self.jump_probe_ready = False
@@ -851,7 +851,7 @@ class PRTouchEndstopWrapper:
             self.gcode.run_script_from_command('BED_MESH_PROFILE LOAD=\"default\"')
         mesh = self.bed_mesh.get_mesh()
         self.bed_mesh.set_mesh(None)
-        self.set_step_par(load_sys=False)
+        self._set_step_par(load_sys=False)
         now_pos = self.toolhead.get_position()
         self.toolhead.set_position(now_pos[:2] + [0, now_pos[3]], homing_axes=[2])
         min_x, min_y = self.bed_mesh.bmc.mesh_min
@@ -860,29 +860,29 @@ class PRTouchEndstopWrapper:
         # 1. Check hot temp
         target_temp = self.heater_hot.target_temp
         if self.g28_wait_cool_down and self.heater_hot.smoothed_temp > (self.hot_min_temp + 5):
-            self.print_msg('DEBUG', 'G28_Z: Wait for Nozzle to cool down[%.2f -> %.2f]...' % (target_temp, self.hot_min_temp))
-            self.set_fan_speed('fan', 1.0)
-            self.set_hot_temps(temp=self.hot_min_temp, wait=True, err=5)
-            self.set_fan_speed('fan', 0.0)
+            self._print_msg('DEBUG', 'G28_Z: Wait for Nozzle to cool down[%.2f -> %.2f]...' % (target_temp, self.hot_min_temp))
+            self._set_fan_speed('fan', 1.0)
+            self._set_hot_temps(temp=self.hot_min_temp, wait=True, err=5)
+            self._set_fan_speed('fan', 0.0)
         # 2. First probe z
         random.seed(int(time.time()))
         now_pos0 = [now_pos[0] + (1 if (int(time.time() * 1000) % 2 == 0) else -1) * random.uniform(4, 8),
                     now_pos[1] + (1 if (int(time.time() * 100) % 2 == 0) else -1) * random.uniform(4, 8), 0, now_pos[3]]
         now_pos1 = [now_pos[0] + random.uniform(-1.0, +1.0), now_pos[1] + random.uniform(-1.0, +1.0), self.best_above_z * 2, now_pos[3]]
         if self.use_adc:
-            self.set_fan_speed('heater_fan', self.fan_heat_min_spd)
-        self.set_fan_speed('fan', 0.0)
+            self._set_fan_speed('heater_fan', self.fan_heat_min_spd)
+        self._set_fan_speed('fan', 0.0)
         self.move(now_pos0, self.rdy_xy_spd / 5)
-        self.env_self_check()
+        self._env_self_check()
         out_mms = []
         old_tri_z_spd = self.tri_z_down_spd
         old_best_above_z = self.best_above_z
         for i in range(20):
             self.enable_steps()
-            self.print_msg('RUN_G28_Z', 'Start Coarse Probe, Test Index=%d...' % i)
+            self._print_msg('RUN_G28_Z', 'Start Coarse Probe, Test Index=%d...' % i)
             self.step_res, self.pres_res = [], []
             params = self.deal_avgs_prtouch_cmd.send([self.pres_oid, 8])
-            self.print_msg('AVGS_RESAULT', str(params))
+            self._print_msg('AVGS_RESAULT', str(params))
             step_cnt_down, step_us_down, acc_ctl_cnt = self.get_step_cnts(self.max_z * 1.2, self.tri_z_down_spd * (1.2 if self.use_adc else 2.0))
             self.start_pres_prtouch_cmd.send([self.pres_oid, 0, self.tri_acq_ms, self.tri_send_ms, self.tri_need_cnt,
                                               int(self.tri_hftr_cut*1000),  int(self.tri_lftr_k1 * 1000) if self.use_adc else int(self.tri_lftr_k1 * 1000 * 0.85),
@@ -890,17 +890,17 @@ class PRTouchEndstopWrapper:
             self.start_step_prtouch_cmd.send([self.step_oid, 0, self.tri_send_ms, step_cnt_down, step_us_down, acc_ctl_cnt, self.low_spd_nul, self.send_step_duty, 0])
             t_last = time.time()
             while (time.time() - t_last < (self.max_z * 2.0) / (self.tri_z_down_spd * 1.2)) and (len(self.step_res) != MAX_BUF_LEN or len(self.pres_res) != MAX_BUF_LEN):
-                self.delay_s(0.010)
+                self._delay_s(0.010)
             self.start_step_prtouch_cmd.send([self.step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
             self.start_pres_prtouch_cmd.send([self.pres_oid, 0, 0, 0, 0, 0, 0, 0, 0])
-            self.ck_and_manual_get_step()
+            self._ck_and_manual_get_step()
 
             if len(self.pres_res) == 0:
                 self.gcode.run_script_from_command('FORCE_MOVE STEPPER=stepper_z DISTANCE=-1 VELOCITY=5')
                 self.gcode.run_script_from_command('FORCE_MOVE STEPPER=stepper_z DISTANCE=1 VELOCITY=5')
 
             out_mm = (self.toolhead.get_position()[2] - (step_cnt_down - self.step_res[-1]['step']) * self.mm_per_step) \
-                    if len(self.pres_res) != MAX_BUF_LEN else self.cal_tri_data(step_cnt_down, self.toolhead.get_position()[2], self.step_res, self.pres_res)
+                    if len(self.pres_res) != MAX_BUF_LEN else self._cal_tri_data(step_cnt_down, self.toolhead.get_position()[2], self.step_res, self.pres_res)
 
             self.toolhead.set_position(now_pos0[:2] + [0, now_pos0[3]], homing_axes=[2])
             self.move(now_pos0[:2] + [self.best_above_z * 2, now_pos0[3]], self.tri_z_up_spd * (1.2 if self.use_adc else 2.0))
@@ -909,15 +909,15 @@ class PRTouchEndstopWrapper:
                 del out_mms[0]
             _out_mms = list(out_mms)
             _out_mms.sort()
-            self.print_ary('G28_FIRST_MMS', _out_mms, len(_out_mms), 3)
+            self._print_ary('G28_FIRST_MMS', _out_mms, len(_out_mms), 3)
             if len(_out_mms) == 3 and (_out_mms[0] + _out_mms[1] < 2.0):
                 break
             if i == 9:
-                self.print_msg('RUN_G28_Z', 'Out of 5, shake motor...')
+                self._print_msg('RUN_G28_Z', 'Out of 5, shake motor...')
                 self.tri_z_down_spd *= 0.40
                 self.best_above_z *= 2
-                self.shake_motor(self.shake_cnt)
-            self.ck_and_raise_error(i == 19, ERR_G28_Z_DETECTION_TIMEOUT)
+                self._shake_motor(self.shake_cnt)
+            self._ck_and_raise_error(i == 19, ERR_G28_Z_DETECTION_TIMEOUT)
         if not accurate:
             return
         # 3. Normal probe z
@@ -925,40 +925,40 @@ class PRTouchEndstopWrapper:
         self.best_above_z = old_best_above_z
 
         for i in range(3):
-            self.print_msg('RUN_G28_Z', 'Start Precision Probe...')
+            self._print_msg('RUN_G28_Z', 'Start Precision Probe...')
             self.move(self.toolhead.get_position()[:2] + [now_pos1[2]], self.rdy_z_spd)
             self.move(now_pos1, self.rdy_xy_spd / 5)
-            self.shake_motor(self.shake_cnt)
+            self._shake_motor(self.shake_cnt)
             res_z = self.run_step_prtouch(self.max_z * 1.2, self.probe_min_3err, False, 5, 5, True)
             self.toolhead.set_position(now_pos1[:2] + [self.toolhead.get_position()[2] - res_z, now_pos[3]], homing_axes=[2])
-            self.print_msg('RUN_G28_Z', 'Start Result Check Probe...')
+            self._print_msg('RUN_G28_Z', 'Start Result Check Probe...')
             self.move(now_pos1[:2] + [self.bed_max_err, now_pos[3]], self.rdy_z_spd)
             ck_z = self.run_step_prtouch(self.max_z * 1.2, self.probe_min_3err, False, 3, 3, True)
             if math.fabs(ck_z) > 1.0:
                 self.tri_z_down_spd *= 0.9
-                self.ck_and_raise_error(i == 2, ERR_G28_Z_DETECTION_ERROR)
+                self._ck_and_raise_error(i == 2, ERR_G28_Z_DETECTION_ERROR)
                 continue
             break
         self.tri_z_down_spd = old_tri_z_spd
 
         # 4. Set hot temp to old target
         if self.g28_wait_cool_down:
-            self.print_msg('DEBUG', 'G28_Z: Wait for Nozzle to recovery[%.2f -> %.2f]...' % (self.hot_min_temp, target_temp))
-            self.set_hot_temps(temp=target_temp, wait=target_temp > self.hot_min_temp, err=5)
+            self._print_msg('DEBUG', 'G28_Z: Wait for Nozzle to recovery[%.2f -> %.2f]...' % (self.hot_min_temp, target_temp))
+            self._set_hot_temps(temp=target_temp, wait=target_temp > self.hot_min_temp, err=5)
         if self.use_adc:
-            self.set_fan_speed('heater_fan', self.fan_heat_max_spd)
-        self.set_step_par(load_sys=True)
+            self._set_fan_speed('heater_fan', self.fan_heat_max_spd)
+        self._set_step_par(load_sys=True)
         self.bed_mesh.set_mesh(mesh)
 
     cmd_READ_PRES_help = "Read The Press Vals."
     def cmd_READ_PRES(self, gcmd):
-        self.print_msg('VERSION', 'ARM(PRTH)=%s, MCU(PRES)=%s, MCU(STEP)=%s' % (self.ver_prth, self.ver_pres, self.ver_step))
+        self._print_msg('VERSION', 'ARM(PRTH)=%s, MCU(PRES)=%s, MCU(STEP)=%s' % (self.ver_prth, self.ver_pres, self.ver_step))
         self.pres_res = []
         read_cnt = gcmd.get_int('C', 1)
         self.read_pres_prtouch_cmd.send([self.pres_oid, self.tri_acq_ms, read_cnt])
         start_tick_s = time.time()
         while ((time.time() - start_tick_s) < (1.5 * (self.tri_acq_ms / 1000.) * read_cnt)) and len(self.pres_res) < read_cnt:
-            self.delay_s(0.010)
+            self._delay_s(0.010)
         pnt_vals = [[], [], [], []]
         pnt_tick = []
         for i in range(len(self.pres_res)):
@@ -966,9 +966,9 @@ class PRTouchEndstopWrapper:
             for j in range(self.pres_cnt):
                 pnt_vals[j].append(self.pres_res[i]['ch%d' % j])
 
-        self.print_ary('READ_PRES_TICKS', pnt_tick, len(pnt_tick), 3, True)
+        self._print_ary('READ_PRES_TICKS', pnt_tick, len(pnt_tick), 3, True)
         for i in range(self.pres_cnt):
-            self.print_ary('READ_PRES_CH%d' % i, pnt_vals[i], len(pnt_vals[i]), 0, True)
+            self._print_ary('READ_PRES_CH%d' % i, pnt_vals[i], len(pnt_vals[i]), 0, True)
 
     cmd_TEST_SWAP_help = "Test The Swap Pin."
     def cmd_TEST_SWAP(self, gcmd):
@@ -980,26 +980,26 @@ class PRTouchEndstopWrapper:
         self.write_swap_prtouch_cmd.send([self.pres_oid, 1])
         params1 = self.read_swap_prtouch_cmd.send([self.step_oid])
         if not params0 or not params1 or params0['sta'] != 0 or params1['sta'] != 1:
-            self.print_msg('SWAP_TEST', '!!!Swap Test ERROR!!!', True)
+            self._print_msg('SWAP_TEST', '!!!Swap Test ERROR!!!', True)
         else:
-            self.print_msg('SWAP_TEST', '---Swap Test Success---', True)
+            self._print_msg('SWAP_TEST', '---Swap Test Success---', True)
 
     cmd_DEAL_AVGS_help = "Read And Cal The Avgs."
     def cmd_DEAL_AVGS(self, gcmd):
         read_cnt = gcmd.get_int('C', 8)
         params = self.deal_avgs_prtouch_cmd.send([self.pres_oid, read_cnt])
-        self.print_msg('AVGS_RESAULT', str(params), True)
+        self._print_msg('AVGS_RESAULT', str(params), True)
 
     cmd_NOZZLE_CLEAR_help = "Clear the nozzle on bed."
     def cmd_NOZZLE_CLEAR(self, gcmd):
         hot_min_temp = gcmd.get_float('HOT_MIN_TEMP', self.hot_min_temp)
         hot_max_temp = gcmd.get_float('HOT_MAX_TEMP', self.hot_max_temp)
         bed_max_temp = gcmd.get_float('BED_MAX_TEMP', self.bed_max_temp)
-        self.clear_nozzle(hot_min_temp, hot_max_temp, bed_max_temp)
+        self._clear_nozzle(hot_min_temp, hot_max_temp, bed_max_temp)
 
     cmd_CHECK_BED_MESH_help = "Check the bed mesh."
     def cmd_CHECK_BED_MESH(self, gcmd):
-        self.check_bed_mesh(gcmd.get_int('AUTO_G29', 0) > 0)
+        self._check_bed_mesh(gcmd.get_int('AUTO_G29', 0) > 0)
 
     cmd_START_STEP_PRTOUCH_help = "Start the step prtouch."
     def cmd_START_STEP_PRTOUCH(self, gcmd):
@@ -1013,15 +1013,15 @@ class PRTouchEndstopWrapper:
         self.start_step_prtouch_cmd.send([self.step_oid, run_dir, self.tri_send_ms, step_cnt, step_us, acc_ctl_cnt, self.low_spd_nul, self.send_step_duty, 0])
         t_last = time.time()
         while (time.time() - t_last < (run_dis / run_spd + 5)) and (len(self.step_res) != MAX_BUF_LEN):
-            self.delay_s(0.010)
+            self._delay_s(0.010)
         self.start_step_prtouch_cmd.send([self.step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
-        self.ck_and_raise_error(len(self.step_res) != MAX_BUF_LEN, ERR_STEP_LOST_RUN_DATA, [len(self.step_res)])
+        self._ck_and_raise_error(len(self.step_res) != MAX_BUF_LEN, ERR_STEP_LOST_RUN_DATA, [len(self.step_res)])
 
     cmd_PRTOUCH_READY_help = "Test the ready point."
     def cmd_PRTOUCH_READY(self, gcmd):
         del gcmd
 
-        self.probe_ready()
+        self._probe_ready()
 
     cmd_SAFE_MOVE_Z_help = "Safe move z"
     def cmd_SAFE_MOVE_Z(self, gcmd):
@@ -1029,13 +1029,13 @@ class PRTouchEndstopWrapper:
         run_dis = gcmd.get_float('DIS', +10)
         run_spd = gcmd.get_float('SPD', 5.0)
         run_rdo = gcmd.get_float('RDO', 1.0)
-        self.safe_move_z(run_sta, run_dis, run_spd, run_rdo)
+        self._safe_move_z(run_sta, run_dis, run_spd, run_rdo)
 
     cmd_COARSE_HOME_Z_help = "Coarse home z"
     def cmd_COARSE_HOME_Z(self, gcmd):
         del gcmd
 
-        self.run_G28_Z(False)
+        self._run_G28_Z(False)
 
     cmd_SAFE_DOWN_Z_help = "Safe down z before G28"
     def cmd_SAFE_DOWN_Z(self, gcmd):
@@ -1051,13 +1051,13 @@ class PRTouchEndstopWrapper:
                 self.start_step_prtouch_cmd.send([self.step_oid, 1, self.tri_send_ms, step_cnt_down, step_us_down, acc_ctl_cnt, self.low_spd_nul, self.send_step_duty, 0])
                 t_last = time.time()
                 while ((time.time() - t_last) < ((self.safe_z_dead_dis / 1.0) + 10)) and (len(self.step_res) != MAX_BUF_LEN):
-                    self.delay_s(0.010)
+                    self._delay_s(0.010)
                 self.start_step_prtouch_cmd.send([self.step_oid, 1, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
-                self.ck_and_manual_get_step()
+                self._ck_and_manual_get_step()
                 down_dis -= self.safe_z_dead_dis
             self.step_res, self.pres_res = [], []
             params = self.deal_avgs_prtouch_cmd.send([self.pres_oid, 8])
-            self.print_msg('AVGS_RESAULT', str(params))
+            self._print_msg('AVGS_RESAULT', str(params))
             step_cnt_down, step_us_down, acc_ctl_cnt = self.get_step_cnts(down_dis, self.tri_z_down_spd)
             self.start_pres_prtouch_cmd.send([self.pres_oid, 1, self.tri_acq_ms, self.tri_send_ms, self.tri_need_cnt,
                                               int(self.tri_hftr_cut * 1000), int(self.tri_lftr_k1 * 1000),
@@ -1065,11 +1065,11 @@ class PRTouchEndstopWrapper:
             self.start_step_prtouch_cmd.send([self.step_oid, 1, self.tri_send_ms, step_cnt_down, step_us_down, acc_ctl_cnt, self.low_spd_nul, self.send_step_duty, 0])
             t_last = time.time()
             while ((time.time() - t_last) < ((down_dis / self.tri_z_down_spd) + 10)) and (len(self.step_res) != MAX_BUF_LEN):
-                self.delay_s(0.010)
+                self._delay_s(0.010)
             self.start_step_prtouch_cmd.send([self.step_oid, 1, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
             self.start_pres_prtouch_cmd.send([self.pres_oid, 1, 0, 0, 0, 0, 0, 0, 0])
-            self.print_res()
-            self.ck_and_manual_get_step()
+            self._print_res()
+            self._ck_and_manual_get_step()
 
         if up_dis != 0:
             if self.safe_z_dead_dis != 0 and up_dis > self.safe_z_dead_dis + 1:
@@ -1078,13 +1078,13 @@ class PRTouchEndstopWrapper:
                 self.start_step_prtouch_cmd.send([self.step_oid, 0, self.tri_send_ms, step_cnt_up, step_us_up, 0, self.low_spd_nul, self.send_step_duty, 0])
                 t_last = time.time()
                 while ((time.time() - t_last) < ((self.safe_z_dead_dis / 1.0) + 10)) and (len(self.step_res) != MAX_BUF_LEN):
-                    self.delay_s(0.010)
+                    self._delay_s(0.010)
                 self.start_step_prtouch_cmd.send([self.step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
-                self.ck_and_manual_get_step()
+                self._ck_and_manual_get_step()
                 up_dis -= self.safe_z_dead_dis
             self.step_res, self.pres_res = [], []
             params = self.deal_avgs_prtouch_cmd.send([self.pres_oid, 8])
-            self.print_msg('AVGS_RESAULT', str(params))
+            self._print_msg('AVGS_RESAULT', str(params))
             step_cnt_up, step_us_up, acc_ctl_cnt = self.get_step_cnts(up_dis, self.tri_z_down_spd)
             self.start_pres_prtouch_cmd.send([self.pres_oid, 0, self.tri_acq_ms, self.tri_send_ms, self.tri_need_cnt,
                                               int(self.tri_hftr_cut * 1000), int(self.tri_lftr_k1 * 1000),
@@ -1092,10 +1092,10 @@ class PRTouchEndstopWrapper:
             self.start_step_prtouch_cmd.send([self.step_oid, 0, self.tri_send_ms, step_cnt_up, step_us_up, acc_ctl_cnt, self.low_spd_nul, self.send_step_duty, 0])
             t_last = time.time()
             while ((time.time() - t_last) < ((up_dis / self.tri_z_down_spd) + 10)) and (len(self.step_res) != MAX_BUF_LEN):
-                self.delay_s(0.010)
+                self._delay_s(0.010)
             self.start_step_prtouch_cmd.send([self.step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
             self.start_pres_prtouch_cmd.send([self.pres_oid, 0, 0, 0, 0, 0, 0, 0, 0])
-            self.ck_and_manual_get_step()
+            self._ck_and_manual_get_step()
 
     cmd_TRIG_TEST_help = "Test The Tri is Normal"
     def cmd_TRIG_TEST(self, gcmd):
@@ -1108,13 +1108,13 @@ class PRTouchEndstopWrapper:
     def cmd_SELF_CHECK_PRTOUCH(self, gcmd):
         del gcmd
 
-        self.env_self_check(force=True)
+        self._env_self_check(force=True)
 
     cmd_TEST_PRTH_help = "For Debug Cmd"
     def cmd_TEST_PRTH(self, gcmd):
         del gcmd
 
-        self.ck_and_raise_error(True, ERR_G28_Z_DETECTION_TIMEOUT)
+        self._ck_and_raise_error(True, ERR_G28_Z_DETECTION_TIMEOUT)
 
 def load_config(config):
     vrt = PRTouchEndstopWrapper(config)

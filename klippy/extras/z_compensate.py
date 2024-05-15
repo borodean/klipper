@@ -68,13 +68,13 @@ class ZCompensateInit:
         self.run_max_z_velocity = config.getfloat('run_max_z_velocity', default=20, minval=1, maxval=5000)
         self.run_max_z_accel    = config.getfloat('run_max_z_accel', default=200, minval=1, maxval=50000)
 
-    def delay_s(self, delay_s):
+    def _delay_s(self, delay_s):
         reactor = self.printer.get_reactor()
         eventtime = reactor.monotonic()
         if not self.printer.is_shutdown():
             self.toolhead.get_last_move_time()
             eventtime = reactor.pause(eventtime + delay_s)
-    def TEST_SWAP(self):
+    def _TEST_SWAP(self):
         self.toolhead   = self.printer.lookup_object("toolhead")
         self.prtouch.write_swap_prtouch_cmd.send([self.prtouch.pres_oid, 0])
         params0 = self.prtouch.read_swap_prtouch_cmd.send([self.prtouch.step_oid])
@@ -82,18 +82,18 @@ class ZCompensateInit:
         self.prtouch.write_swap_prtouch_cmd.send([self.prtouch.pres_oid, 1])
         params1 = self.prtouch.read_swap_prtouch_cmd.send([self.prtouch.step_oid])
         if not params0 or not params1 or params0['sta'] != 0 or params1['sta'] != 1:
-            self.print_msg('SWAP_TEST', '!!!Swap Test ERROR!!!', True)
-            self.ck_and_raise_error(True,ERR_SSAP_TEST_ERROR)
+            self._print_msg('SWAP_TEST', '!!!Swap Test ERROR!!!', True)
+            self._ck_and_raise_error(True,ERR_SSAP_TEST_ERROR)
         else:
-            self.print_msg('SWAP_TEST', '---Swap Test Success---', True)
+            self._print_msg('SWAP_TEST', '---Swap Test Success---', True)
 
-    def print_msg(self, title, msg, force=False):
+    def _print_msg(self, title, msg, force=False):
         if not force:
             return
         if title != 'SHOW_WAVE':
             self.gcode.respond_info('[' + title + ']' + msg)
 
-    def ck_and_raise_error(self, ck, err, vals=[]):
+    def _ck_and_raise_error(self, ck, err, vals=[]):
         if not ck:
             return
         self.prtouch.enable_steps()
@@ -102,34 +102,34 @@ class ZCompensateInit:
         self.prtouch.start_step_prtouch_cmd.send([self.prtouch.step_oid, 1, self.prtouch.tri_send_ms, step_cnt, step_us, acc_ctl_cnt, self.low_spd_nul, self.send_step_duty, 0])
         t_last = time.time()
         while (time.time() - t_last < 20) and (len(self.prtouch.step_res) != MAX_BUF_LEN):
-            self.delay_s(0.010)
+            self._delay_s(0.010)
         self.prtouch.start_step_prtouch_cmd.send([self.prtouch.step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
         self.toolhead.set_position(now_pos[:2] + [0, now_pos[3]], homing_axes=[2])
 
         self.prtouch.disable_steps()
         msg = err % tuple(vals)
-        self.print_msg('RAISE_ERROR', msg, True)
+        self._print_msg('RAISE_ERROR', msg, True)
         shutdown_msg = 'Shutdown due to ' + msg
         self.printer.invoke_shutdown(shutdown_msg)
         raise self.printer.command_error(shutdown_msg)
 
-    def move(self, pos, speed, wait=True):
+    def _move(self, pos, speed, wait=True):
         if not self.shut_down:
             self.gcode.run_script_from_command('G1 F%d X%.3f Y%.3f Z%.3f' % (speed * 60, pos[0], pos[1], pos[2]) if len(pos) >= 3 else 'G1 F%d X%.3f Y%.3f' % (speed * 60, pos[0], pos[1]))
             if wait:
                 self.toolhead.wait_moves()
-    def set_hot_temps(self, temp, wait=False, err=5):
+    def _set_hot_temps(self, temp, wait=False, err=5):
         self.pheaters.set_temperature(self.heater_hot, temp, False)
         if wait:
             while not self.shut_down and abs(self.heater_hot.target_temp - self.heater_hot.smoothed_temp) > err and self.heater_hot.target_temp > 0:
-                self.delay_s(0.100)
+                self._delay_s(0.100)
 
-    def set_bed_temps(self, temp, wait=False, err=5):
+    def _set_bed_temps(self, temp, wait=False, err=5):
         self.pheaters.set_temperature(self.heater_bed, temp, False)
         if wait:
             while not self.shut_down and abs(self.heater_bed.target_temp - self.heater_bed.smoothed_temp) > err and self.heater_bed.target_temp > 0:
-                self.delay_s(0.100)
-    def set_step_par(self, load_sys=True):
+                self._delay_s(0.100)
+    def _set_step_par(self, load_sys=True):
         if load_sys:
             self.toolhead.max_velocity = self.sys_max_velocity
             self.toolhead.max_accel = self.sys_max_accel
@@ -145,48 +145,48 @@ class ZCompensateInit:
         self.toolhead.max_accel = self.run_max_accel
         self.toolhead.kin.max_z_velocity = self.run_max_z_velocity
         self.toolhead.kin.max_z_accel = self.run_max_z_accel
-    def cr10se_clear_nozzle(self, hot_start_temp, hot_rub_temp, hot_end_temp, bed_add_temp):
+    def _cr10se_clear_nozzle(self, hot_start_temp, hot_rub_temp, hot_end_temp, bed_add_temp):
         min_x, min_y = self.clr_noz_start_x, self.clr_noz_start_y
         if self.type_nozz == 1 :
             hot_start_temp = hot_end_temp = hot_rub_temp
-        self.set_bed_temps(temp=bed_add_temp, wait=False)
-        self.set_hot_temps(temp=hot_start_temp, wait=False, err=10)
+        self._set_bed_temps(temp=bed_add_temp, wait=False)
+        self._set_hot_temps(temp=hot_start_temp, wait=False, err=10)
         mesh = self.bed_mesh.get_mesh()
         self.bed_mesh.set_mesh(None)
-        self.set_step_par(load_sys=False)
+        self._set_step_par(load_sys=False)
         random.seed(time.time())
         cur_pos = self.toolhead.get_position()
         src_pos = [min_x + random.uniform(0, self.clr_noz_len_x - self.pa_clr_dis_mm_x),
                    min_y + random.uniform(0, self.clr_noz_len_y - self.pa_clr_dis_mm_y), self.bed_max_err, cur_pos[3]]
         end_pos = [src_pos[0] + self.pa_clr_dis_mm_x, src_pos[1] + self.pa_clr_dis_mm_y, src_pos[2], src_pos[3]]
 
-        self.set_hot_temps(temp=hot_start_temp, wait=True, err=10)
-        self.move([src_pos[0], src_pos[1], src_pos[2]], self.rdy_xy_spd)
+        self._set_hot_temps(temp=hot_start_temp, wait=True, err=10)
+        self._move([src_pos[0], src_pos[1], src_pos[2]], self.rdy_xy_spd)
         src_pos[2] = self.prtouch.run_step_prtouch(self.g29_down_min_z, 0, False, self.pr_clear_probe_cnt, self.pr_clear_probe_cnt, True, self.tri_min_hold, self.tri_max_hold)
-        self.move([end_pos[0], end_pos[1], end_pos[2]], self.rdy_xy_spd)
+        self._move([end_pos[0], end_pos[1], end_pos[2]], self.rdy_xy_spd)
         end_pos[2] = self.prtouch.run_step_prtouch(self.g29_down_min_z, 0, False, self.pr_clear_probe_cnt, self.pr_clear_probe_cnt, True, self.tri_min_hold, self.tri_max_hold)
-        self.move([src_pos[0], src_pos[1], self.bed_max_err], self.rdy_xy_spd)
-        self.move([src_pos[0], src_pos[1] + 5, src_pos[2] - self.pa_clr_down_mm], self.rdy_z_spd)#移到擦喷嘴起始点
-        self.set_hot_temps(temp=hot_rub_temp, wait=True, err=10) #等待加热
+        self._move([src_pos[0], src_pos[1], self.bed_max_err], self.rdy_xy_spd)
+        self._move([src_pos[0], src_pos[1] + 5, src_pos[2] - self.pa_clr_down_mm], self.rdy_z_spd)#移到擦喷嘴起始点
+        self._set_hot_temps(temp=hot_rub_temp, wait=True, err=10) #等待加热
         self.gcode.run_script_from_command('G91')
         self.gcode.run_script_from_command('G0 E-%f' %(self.pumpback_mm)) #回抽
         self.gcode.run_script_from_command('G90')
         cur_pos = self.toolhead.get_position()
         end_pos[3] = cur_pos[3]
-        self.move([end_pos[0], end_pos[1] - 5, end_pos[2] + self.pa_clr_down_mm], self.clr_xy_spd)# 擦喷嘴
+        self._move([end_pos[0], end_pos[1] - 5, end_pos[2] + self.pa_clr_down_mm], self.clr_xy_spd)# 擦喷嘴
         self.gcode.run_script_from_command('M106 S255')
-        self.set_hot_temps(temp=hot_end_temp, wait=True, err=5)
-        self.set_bed_temps(temp=bed_add_temp, wait=True, err=5) #等待降温
-        self.move([end_pos[0] + self.pa_clr_dis_mm, end_pos[1], end_pos[2] + self.bed_max_err], 100) #上抬
+        self._set_hot_temps(temp=hot_end_temp, wait=True, err=5)
+        self._set_bed_temps(temp=bed_add_temp, wait=True, err=5) #等待降温
+        self._move([end_pos[0] + self.pa_clr_dis_mm, end_pos[1], end_pos[2] + self.bed_max_err], 100) #上抬
         self.gcode.run_script_from_command('M107')
-        self.set_bed_temps(temp=bed_add_temp, wait=True, err=5)
-        self.set_step_par(load_sys=True)
+        self._set_bed_temps(temp=bed_add_temp, wait=True, err=5)
+        self._set_step_par(load_sys=True)
         self.bed_mesh.set_mesh(mesh)
         self.gcode.run_script_from_command('G28 Z')
 
     cmd_CR10SE_NOZZLE_CLEAR_help = "Clear the nozzle on bed."
     def cmd_CR10SE_NOZZLE_CLEAR(self, gcmd):
-        self.TEST_SWAP()
+        self._TEST_SWAP()
         self.gcode.run_script_from_command('SET_GCODE_OFFSEt Z_ADJUST=%f MOVE=1' %(0 - self.z_offset_move))
         self.z_offset_move = 0
         self.bed_mesh   = self.printer.lookup_object('bed_mesh')
@@ -198,7 +198,7 @@ class ZCompensateInit:
         hot_rub_temp = gcmd.get_float('HOT_RUB_TEMP', self.hot_rub_temp)
         hot_end_temp = gcmd.get_float('HOT_END_TEMP', self.hot_end_temp)
         bed_add_temp = gcmd.get_float('BED_ADDTEMP', self.bed_add_temp)
-        self.cr10se_clear_nozzle(hot_start_temp, hot_rub_temp, hot_end_temp, bed_add_temp)
+        self._cr10se_clear_nozzle(hot_start_temp, hot_rub_temp, hot_end_temp, bed_add_temp)
 
 
     cmd_Z_OFFSET_CALIBRATION_help = "Z offset calibration"
@@ -224,7 +224,7 @@ class ZCompensateInit:
         bl_data = [[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]]
         now_pos = self.toolhead.get_position()
         for i in [0,1]:
-            self.move([pr_pos[i][0] - self.bl_offset[0], pr_pos[i][1] - self.bl_offset[1]] + [8, now_pos[3]], 100)
+            self._move([pr_pos[i][0] - self.bl_offset[0], pr_pos[i][1] - self.bl_offset[1]] + [8, now_pos[3]], 100)
             bl_data[i] = self.printer.lookup_object('probe').run_probe(gcmd)
 
             self.prtouch.move([pr_pos[i][0], pr_pos[i][1]] + [self.vs_start_z_pos, now_pos[3]], 100)
@@ -247,7 +247,7 @@ class ZCompensateInit:
         if new_calibrate < 0:
             self.gcode.run_script_from_command('SET_GCODE_OFFSEt Z_ADJUST=%f MOVE=1' % (-self.z_offset_move))
             self.z_offset_move = 0
-            self.ck_and_raise_error(new_calibrate < 0,ERR_Z_OFFSET_CALIBRATION)
+            self._ck_and_raise_error(new_calibrate < 0,ERR_Z_OFFSET_CALIBRATION)
 
         self.gcode.respond_info(
                 "%s: z_offset: %.3f\n"
@@ -261,7 +261,7 @@ class ZCompensateInit:
 
     cmd_Z_OFFSET_AUTO_help = "Z offset auto"
     def cmd_Z_OFFSET_AUTO(self, gcmd):   # PRTOUCH_TEST X=20 Y=20 Z=-4 S=0.0125
-        self.TEST_SWAP()
+        self._TEST_SWAP()
         self.gcode.run_script_from_command('SET_GCODE_OFFSEt Z_ADJUST=%f MOVE=1' %(0 - self.z_offset_move))
         self.z_offset_move = 0
         self.cmd_CR10SE_NOZZLE_CLEAR(gcmd)
