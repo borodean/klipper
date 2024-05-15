@@ -11,7 +11,6 @@ import random
 
 # COMMANDS
 
-# START_STEP_PRTOUCH DIR=1 SPD=10 DIS=10
 # FORCE_MOVE STEPPER=stepper_x DISTANCE=5 VELOCITY=10
 # PID_CALIBRATE HEATER=extruder TARGET=210
 # PID_CALIBRATE HEATER=heater_bed TARGET=60
@@ -102,8 +101,6 @@ class PRTouchEndstopWrapper:
 
         self.step_mcu.register_config_callback(self._build_step_config)
         self.pres_mcu.register_config_callback(self._build_pres_config)
-
-        self.gcode.register_command('START_STEP_PRTOUCH', self.cmd_START_STEP_PRTOUCH, desc=self.cmd_START_STEP_PRTOUCH_help)
 
         self.step_mcu.register_response(self._handle_result_run_step_prtouch, "result_run_step_prtouch", self.public_step_oid)
         self.pres_mcu.register_response(self._handle_result_run_pres_prtouch, "result_run_pres_prtouch", self.public_pres_oid)
@@ -473,22 +470,6 @@ class PRTouchEndstopWrapper:
         res_z.sort()
         self._print_ary('RES_Z', res_z, len(res_z))
         return res_z[int((len(res_z) - 1) / 2)] if len(res_z) != 2 else (res_z[0] + res_z[1]) / 2
-
-    cmd_START_STEP_PRTOUCH_help = "Start the step prtouch."
-    def cmd_START_STEP_PRTOUCH(self, gcmd):
-        self.public_enable_steps()
-        self.public_get_mm_per_step()
-        run_dir = gcmd.get_int('DIR', 0)
-        run_spd = gcmd.get_float('SPD', 10)
-        run_dis = gcmd.get_float('DIS', 10)
-        self.public_step_res = []
-        step_cnt, step_us, acc_ctl_cnt = self.public_get_step_cnts(run_dis, run_spd)
-        self.public_start_step_prtouch_cmd.send([self.public_step_oid, run_dir, self.public_tri_send_ms, step_cnt, step_us, acc_ctl_cnt, self.low_spd_nul, self.send_step_duty, 0])
-        t_last = time.time()
-        while (time.time() - t_last < (run_dis / run_spd + 5)) and (len(self.public_step_res) != MAX_BUF_LEN):
-            self._delay_s(0.010)
-        self.public_start_step_prtouch_cmd.send([self.public_step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
-        self._ck_and_raise_error(len(self.public_step_res) != MAX_BUF_LEN, ERR_STEP_LOST_RUN_DATA, [len(self.public_step_res)])
 
 
 def load_config(config):
