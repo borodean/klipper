@@ -11,20 +11,13 @@ import random
 
 # COMMANDS
 
-# SELF_CHECK_PRTOUCH
 # START_STEP_PRTOUCH DIR=1 SPD=10 DIS=10
 # FORCE_MOVE STEPPER=stepper_x DISTANCE=5 VELOCITY=10
 # PID_CALIBRATE HEATER=extruder TARGET=210
 # PID_CALIBRATE HEATER=heater_bed TARGET=60
 
-
-ERR_PRES_READ_DATA_TIMEOUT  = 'The data read interval is too large, need=11ms, actual=%s'
-ERR_PRES_VAL_IS_CONSTANT    = 'The pressure data for channel=%s is incorrect. The value is constant %s'
-ERR_PRES_NOT_BE_SENSED      = 'The pressure data in channel=%s cannot be properly sensed'
 ERR_PRES_LOST_RUN_DATA      = 'The pressure data is lost when the probe is over and waiting for the data to be sent back'
-ERR_PRES_NOISE_TOO_BIG      = 'Sensor data noise is too big, channel=%s'
 ERR_STEP_LOST_RUN_DATA      = 'The motor step data is lost when the probe is over and waiting for data return'
-ERR_SWAP_PIN_DETECTI        = 'The synchronization pin test failed, pres_swap_pin=%s, step_swap_pin=%s'
 
 MAX_PRES_CNT = 4
 MAX_BUF_LEN = 32
@@ -41,7 +34,7 @@ class PRTouchEndstopWrapper:
 
         self.public_step_res, self.pres_res = [], []
         self.public_read_swap_prtouch_cmd, self.public_start_step_prtouch_cmd = None, None
-        self.public_write_swap_prtouch_cmd, self.read_pres_prtouch_cmd, self.start_pres_prtouch_cmd = None, None, None
+        self.public_write_swap_prtouch_cmd, self.start_pres_prtouch_cmd = None, None
         self.bed_mesh, self.toolhead, self.bed_mesh = None, None, None
         # 0. Base Cfg
         self.use_adc            = config.getboolean('use_adc', default=False)
@@ -55,10 +48,6 @@ class PRTouchEndstopWrapper:
         self.cal_lftr_k1        = config.getfloat('cal_lftr_k1', default=(0.65 if self.use_adc else 0.85), minval=0., maxval=1.)
         self.tri_min_hold       = config.getint('tri_min_hold', default=(3 if self.use_adc else 2000), minval=1, maxval=200000)
         self.tri_max_hold       = config.getint('tri_max_hold', default=(3072 if self.use_adc else 6000), minval=self.tri_min_hold, maxval=600000)
-        # 2. Debug Cfg
-        # 3. Shake Z Cfg
-        self.shake_cnt          = config.getint('shake_cnt', default=8, minval=1, maxval=512)
-        self.shake_range        = config.getint('shake_range', default=0.5, minval=0.1, maxval=2)
         # 4. Clear Nozzle Cfg
         self.pa_clr_dis_mm      = config.getfloat('pa_clr_dis_mm', default=30, minval=2, maxval=100)
         self.clr_noz_start_x    = config.getfloat('clr_noz_start_x', default=0, minval=0, maxval=1000)
@@ -68,7 +57,6 @@ class PRTouchEndstopWrapper:
         # 5. Speed Cfg
         self.tri_z_down_spd     = config.getfloat('speed', default=(10 if self.use_adc else 2.5), minval=0.1, maxval=(30 if self.use_adc else 5)) # speed
         self.tri_z_up_spd       = config.getfloat('lift_speed', self.tri_z_down_spd * (1.0 if self.use_adc else 2.0), minval=0.1, maxval=100)
-        self.rdy_z_spd          = config.getfloat('rdy_z_spd', default=self.tri_z_up_spd, minval=1, maxval=50)
         self.acc_ctl_mm         = config.getfloat('acc_ctl_mm', (0.5 if self.use_adc else 0.25), minval=0, maxval=10)
         self.low_spd_nul        = config.getint('low_spd_nul', 5, minval=1, maxval=10)
         self.send_step_duty     = config.getint('send_step_duty', 16, minval=0, maxval=10)
@@ -76,7 +64,6 @@ class PRTouchEndstopWrapper:
         self.stored_profs       = config.get_prefix_sections('prtouch')
         self.stored_profs       = self.stored_profs[1] if len(self.stored_profs) == 2 else None
         # 6. Other Cfg
-        self.need_self_check    = config.getboolean('need_self_check', default=False)
         self.g29_down_min_z     = config.getfloat('g29_down_min_z', default=25, minval=5, maxval=500)
         self.probe_min_3err     = config.getfloat('probe_min_3err', default=0.1, minval=0.01, maxval=1)
         self.step_base          = config.getint('step_base', 1, minval=1, maxval=10)
@@ -116,7 +103,6 @@ class PRTouchEndstopWrapper:
         self.step_mcu.register_config_callback(self._build_step_config)
         self.pres_mcu.register_config_callback(self._build_pres_config)
 
-        self.gcode.register_command('SELF_CHECK_PRTOUCH', self.cmd_SELF_CHECK_PRTOUCH, desc=self.cmd_SELF_CHECK_PRTOUCH_help)
         self.gcode.register_command('START_STEP_PRTOUCH', self.cmd_START_STEP_PRTOUCH, desc=self.cmd_START_STEP_PRTOUCH_help)
 
         self.step_mcu.register_response(self._handle_result_run_step_prtouch, "result_run_step_prtouch", self.public_step_oid)
@@ -169,7 +155,6 @@ class PRTouchEndstopWrapper:
                 self.pres_mcu.add_config_cmd('add_pres_prtouch oid=%d index=%d clk_pin=%s sda_pin=%s' % (self.public_pres_oid, i, clk_par['pin'], sdo_par['pin']))
 
         self.public_write_swap_prtouch_cmd = self.pres_mcu.lookup_query_command('write_swap_prtouch oid=%c sta=%c', 'resault_write_swap_prtouch oid=%c', oid=self.public_pres_oid)
-        self.read_pres_prtouch_cmd = self.pres_mcu.lookup_command('read_pres_prtouch oid=%c acq_ms=%u cnt=%u', cq=None)
         self.start_pres_prtouch_cmd = self.pres_mcu.lookup_command('start_pres_prtouch oid=%c tri_dir=%c acq_ms=%c send_ms=%c need_cnt=%c tri_hftr_cut=%u tri_lftr_k1=%u min_hold=%u max_hold=%u', cq=None)
         self.deal_avgs_prtouch_cmd = self.pres_mcu.lookup_query_command('deal_avgs_prtouch oid=%c base_cnt=%c', 'result_deal_avgs_prtouch oid=%c ch0=%i ch1=%i ch2=%i ch3=%i', oid=self.public_pres_oid)
 
@@ -290,19 +275,6 @@ class PRTouchEndstopWrapper:
             self.gcode.run_script_from_command(gcmd)
             if wait:
                 self.toolhead.wait_moves()
-
-    def _shake_motor(self, cnt):
-        self._print_msg('SHAKE_MOTOR', 'cnt=%d' % cnt)
-        now_pos = self.toolhead.get_position()
-        max_z_velocity = self.toolhead.kin.max_z_velocity
-        for _ in range(int(cnt / 2)):
-            self.gcode.run_script_from_command('G1 X%.2f Y%.2f Z%.2f F%d' % (now_pos[0] - self.shake_range, now_pos[1] - self.shake_range, now_pos[2] - self.shake_range / 2, int(60 * max_z_velocity * 0.25)))
-            self.gcode.run_script_from_command('G1 X%.2f Y%.2f Z%.2f F%d' % (now_pos[0] + self.shake_range, now_pos[1] - self.shake_range, now_pos[2] + self.shake_range / 2, int(60 * max_z_velocity * 0.25)))
-            self.gcode.run_script_from_command('G1 X%.2f Y%.2f Z%.2f F%d' % (now_pos[0] + self.shake_range, now_pos[1] + self.shake_range, now_pos[2] - self.shake_range / 2, int(60 * max_z_velocity * 0.25)))
-            self.gcode.run_script_from_command('G1 X%.2f Y%.2f Z%.2f F%d' % (now_pos[0] - self.shake_range, now_pos[1] + self.shake_range, now_pos[2] + self.shake_range / 2, int(60 * max_z_velocity * 0.25)))
-            while len(self.toolhead.move_queue.queue) >= 5:
-                self._delay_s(0.010)
-        self.public_move(now_pos, self.rdy_z_spd)
 
     def _ck_and_manual_get_step(self):
         if len(self.public_step_res) == MAX_BUF_LEN:
@@ -443,83 +415,6 @@ class PRTouchEndstopWrapper:
                 self.mm_per_step = self.step_base * stepper.get_step_dist()
                 self._print_msg('GET_MM_PER_STEP', str(stepper.get_step_dist()))
 
-    def _env_self_check(self, force=False):
-        # 1. PR_ERR_CODE_SWAP_PIN_DETECTI
-        self.public_write_swap_prtouch_cmd.send([self.public_pres_oid, 0])
-        params0 = self.public_read_swap_prtouch_cmd.send([self.public_step_oid])
-        self.public_write_swap_prtouch_cmd.send([self.public_pres_oid, 1])
-        params1 = self.public_read_swap_prtouch_cmd.send([self.public_step_oid])
-        self._ck_and_raise_error(not params0 or not params1 or params0['sta'] != 0 or params1['sta'] != 1,
-                                ERR_SWAP_PIN_DETECTI, [self.pres_swap_pin, self.step_swap_pin])
-        self._print_msg('DEBUG', '--Self Test 1 = PR_ERR_CODE_SWAP_PIN_DETECTI, Pass!!--', force)
-
-        if not self.need_self_check and not force:
-            return
-
-        # 2. PR_ERR_CODE_PRES_READ_DATA_TIMEOUT
-        self.deal_avgs_prtouch_cmd.send([self.public_pres_oid, 0])
-        self.pres_res = []
-        self.read_pres_prtouch_cmd.send([self.public_pres_oid, self.tri_acq_ms, 32 + 8])
-        start_tick_s = time.time()
-        while ((time.time() - start_tick_s) < (1.5 * (self.tri_acq_ms / 1000.) * 64)) and len(self.pres_res) < 32:
-            self._delay_s(0.010)
-        self.read_pres_prtouch_cmd.send([self.public_pres_oid, self.tri_acq_ms, 0])
-        self._ck_and_raise_error(len(self.pres_res) < 32, ERR_PRES_READ_DATA_TIMEOUT, [32, len(self.pres_res)])
-
-        pnt_tick, pnt_vals = [], [[], [], [], []]
-        for i in range(4, len(self.pres_res) - 4):
-            pnt_tick.append(self.pres_res[i]['tick'] / 10000.)
-            for j in range(self.pres_cnt):
-                pnt_vals[j].append(self.pres_res[i]['ch%d' % j])
-        tr = 0
-        for i in range(1, len(pnt_tick)):
-            tr += pnt_tick[i] - pnt_tick[i - 1]
-        self._print_msg('SELF_CHECK_TICK', str(pnt_tick))
-        self._print_msg('SELF_CHECK_DATA', str(pnt_vals))
-        self._ck_and_raise_error(tr / (len(pnt_tick) - 1) > 2 * self.tri_acq_ms, ERR_PRES_READ_DATA_TIMEOUT, [self.tri_acq_ms, tr / (len(pnt_tick) - 1)])
-        self._print_msg('DEBUG', '--Self Test 2 = PR_ERR_CODE_PRES_READ_DATA_TIMEOUT, Pass!!--', force)
-
-        # 3. PR_ERR_CODE_PRES_VAL_IS_CONSTANT
-        for i in range(self.pres_cnt):
-            sums, avg = 0, sum(pnt_vals[i]) / len(pnt_vals[i])
-            for j in range(len(pnt_vals[i])):
-                pnt_vals[i][j] -= avg
-                sums += math.fabs(pnt_vals[i][j])
-            self._ck_and_raise_error(not sums, ERR_PRES_VAL_IS_CONSTANT)
-        self._print_msg('DEBUG', '--Self Test 3 = PR_ERR_CODE_PRES_VAL_IS_CONSTANT, Pass!!--', force)
-
-        # 4. PR_ERR_CODE_PRES_NOISE_TOO_BIG
-        for i in range(self.pres_cnt):
-            big_cnt = 0
-            for j in range(len(pnt_vals[i])):
-                big_cnt += (1 if math.fabs(pnt_vals[i][j]) > (self.tri_min_hold if not self.use_adc else 200) else 0)
-            self._ck_and_raise_error(big_cnt > len(pnt_vals[i]) / 2, ERR_PRES_NOISE_TOO_BIG)
-        self._print_msg('DEBUG', '--Self Test 4 = PR_ERR_CODE_PRES_NOISE_TOO_BIG, Pass!!--', force=force)
-
-        # 4. PR_ERR_CODE_PRES_NOT_BE_SENSED
-        self.public_enable_steps()
-        self.deal_avgs_prtouch_cmd.send([self.public_pres_oid, 16])
-        now_pos = self.toolhead.get_position()
-        self.toolhead.set_position(now_pos[:2] + [0, now_pos[3]], homing_axes=[2])
-        self.pres_res = []
-        self.read_pres_prtouch_cmd.send([self.public_pres_oid, self.tri_acq_ms, 32 + 8])
-        self._shake_motor(self.shake_cnt)
-        while ((time.time() - start_tick_s) < (1.5 * (self.tri_acq_ms / 1000.) * 64)) and len(self.pres_res) < 32:
-            self._delay_s(0.010)
-        self.read_pres_prtouch_cmd.send([self.public_pres_oid, self.tri_acq_ms, 0])
-        self._ck_and_raise_error(len(self.pres_res) < 32, ERR_PRES_READ_DATA_TIMEOUT, [32, len(self.pres_res)])
-        pnt_tick, pnt_vals = [], [[], [], [], []]
-        for i in range(4, len(self.pres_res) - 4):
-            pnt_tick.append(self.pres_res[i]['tick'] / 10000.)
-            for j in range(self.pres_cnt):
-                pnt_vals[j].append(self.pres_res[i]['ch%d' % j])
-        for i in range(self.pres_cnt):
-            low_cnt = 0
-            for j in range(len(pnt_vals[i])):
-                low_cnt += (1 if abs(pnt_vals[i][j]) < (200 if self.use_adc else 500) else 0)
-            self._ck_and_raise_error(low_cnt > len(pnt_vals[i]) / 2, ERR_PRES_NOT_BE_SENSED)
-        self._print_msg('DEBUG', '--Self Test 5 = PR_ERR_CODE_PRES_NOT_BE_SENSED, Pass!!--', force)
-
     def public_run_step_prtouch(self, down_min_z, probe_min_3err, rt_last=False, pro_cnt=3, crt_cnt=3, fast_probe=False, tri_min_hold=None, tri_max_hold=None):
         if not tri_min_hold or not tri_max_hold:
             tri_min_hold = self.tri_min_hold
@@ -595,11 +490,6 @@ class PRTouchEndstopWrapper:
         self.public_start_step_prtouch_cmd.send([self.public_step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
         self._ck_and_raise_error(len(self.public_step_res) != MAX_BUF_LEN, ERR_STEP_LOST_RUN_DATA, [len(self.public_step_res)])
 
-    cmd_SELF_CHECK_PRTOUCH_help = "Self check the pres."
-    def cmd_SELF_CHECK_PRTOUCH(self, gcmd):
-        del gcmd
-
-        self._env_self_check(force=True)
 
 def load_config(config):
     vrt = PRTouchEndstopWrapper(config)
