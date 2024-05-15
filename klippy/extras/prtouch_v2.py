@@ -14,7 +14,6 @@ import random
 # SELF_CHECK_PRTOUCH
 # START_STEP_PRTOUCH DIR=1 SPD=10 DIS=10
 # NOZZLE_CLEAR HOT_MIN_TEMP=140 HOT_MAX_TEMP=260 BED_MAX_TEMP=100
-# PRTOUCH_READY
 # FORCE_MOVE STEPPER=stepper_x DISTANCE=5 VELOCITY=10
 # PID_CALIBRATE HEATER=extruder TARGET=210
 # PID_CALIBRATE HEATER=heater_bed TARGET=60
@@ -41,10 +40,9 @@ class PRTouchEndstopWrapper:
         self.config = config
         self.printer = config.get_printer()
         self.shut_down = False
-        self.jump_probe_ready, self.has_save_sys_acc = False, False
+        self.has_save_sys_acc = False
         self.safe_move_z_tri_call_back, self.safe_move_z_all_cnt = None, 0
         self.mm_per_step, self.pres_tri_time, self.step_tri_time, self.pres_tri_chs, self.pres_buf_cnt = 0, 0, 0, 0, 0
-        self.rdy_pos = None
         self.mm_per_step = None
         self.sys_max_velocity, self.sys_max_accel, self.sys_max_z_velocity, self.sys_max_z_accel = 0, 0, 0, 0
 
@@ -142,7 +140,6 @@ class PRTouchEndstopWrapper:
         self.step_mcu.register_config_callback(self._build_step_config)
         self.pres_mcu.register_config_callback(self._build_pres_config)
 
-        self.gcode.register_command('PRTOUCH_READY', self.cmd_PRTOUCH_READY, desc=self.cmd_PRTOUCH_READY_help)
         self.gcode.register_command('NOZZLE_CLEAR', self.cmd_NOZZLE_CLEAR, desc=self.cmd_NOZZLE_CLEAR_help)
         self.gcode.register_command('SAFE_DOWN_Z', self.cmd_SAFE_DOWN_Z, desc=self.cmd_SAFE_DOWN_Z_help)
         self.gcode.register_command('SAFE_MOVE_Z', self.cmd_SAFE_MOVE_Z, desc=self.cmd_SAFE_MOVE_Z_help)
@@ -171,8 +168,6 @@ class PRTouchEndstopWrapper:
             self.clr_noz_len_y = 5
 
         random.seed(time.time())
-        self.rdy_pos = [[min_x, min_y, self.bed_max_err], [min_x, max_y, self.bed_max_err],
-                        [max_x, max_y, self.bed_max_err], [max_x, min_y, self.bed_max_err]]
 
         self.step_mcu.add_config_cmd('config_step_prtouch oid=%d step_cnt=%d swap_pin=%s sys_time_duty=%u'
                                      % (self.public_step_oid, len(self.z_step_pins), self.ppins.parse_pin(self.step_swap_pin, True, True)['pin'], int(self.sys_time_duty * 100000)))
@@ -615,23 +610,6 @@ class PRTouchEndstopWrapper:
             self._ck_and_raise_error(low_cnt > len(pnt_vals[i]) / 2, ERR_PRES_NOT_BE_SENSED)
         self._print_msg('DEBUG', '--Self Test 5 = PR_ERR_CODE_PRES_NOT_BE_SENSED, Pass!!--', force)
 
-    def _probe_ready(self):
-        self._print_msg('PROBE_READY', 'Start probe_ready()...')
-        if self.jump_probe_ready:
-            self.jump_probe_ready = False
-            return False
-        self._ck_g28ed()
-        for i in range(len(self.rdy_pos)):
-            self.rdy_pos[i][2] = self.bed_max_err
-        now_pos = self.toolhead.get_position()
-        self.public_move(now_pos[:2] + [self.bed_max_err, now_pos[3]], self.rdy_z_spd)
-        for i in range(4):
-            self._print_msg('PROBE_READY', 'Start Probe Point=%s' % str(self.rdy_pos[i]))
-            self.public_move(self.rdy_pos[i], self.rdy_xy_spd)
-            self.rdy_pos[i][2] = self.public_run_step_prtouch(self.g29_down_min_z, self.probe_min_3err, True, 5, 3, True)
-        self._print_msg('RDY_POS', "[00=%.2f, 01=%.2f, 11=%.2f, 10=%.2f]" % (self.rdy_pos[0][2], self.rdy_pos[1][2], self.rdy_pos[2][2], self.rdy_pos[3][2]))
-        return True
-
     def _safe_move_z(self, run_sta, run_dis, run_spd, run_rdo, tri_call_back = None):
         self._print_msg('SAFE_MOVE_Z', 'run_sta=%d, run_dis=%f, run_spd=%f, run_rdo=%f' % (run_sta, run_dis, run_spd, run_rdo))
         run_dir = 1 if run_dis > 0 else 0
@@ -772,7 +750,6 @@ class PRTouchEndstopWrapper:
         self._print_msg('RUN_G28_Z', 'Start run_G28_Z()...')
         self.public_enable_steps()
         self.public_get_mm_per_step()
-        self.jump_probe_ready = False
         self.toolhead.wait_moves()
         if not self.bed_mesh.get_mesh() and self.bed_mesh.pmgr.profiles.get('default', None):
             self.gcode.run_script_from_command('BED_MESH_PROFILE LOAD=\"default\"')
@@ -899,12 +876,6 @@ class PRTouchEndstopWrapper:
             self._delay_s(0.010)
         self.public_start_step_prtouch_cmd.send([self.public_step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
         self._ck_and_raise_error(len(self.public_step_res) != MAX_BUF_LEN, ERR_STEP_LOST_RUN_DATA, [len(self.public_step_res)])
-
-    cmd_PRTOUCH_READY_help = "Test the ready point."
-    def cmd_PRTOUCH_READY(self, gcmd):
-        del gcmd
-
-        self._probe_ready()
 
     cmd_SAFE_MOVE_Z_help = "Safe move z"
     def cmd_SAFE_MOVE_Z(self, gcmd):
