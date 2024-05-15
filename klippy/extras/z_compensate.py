@@ -20,7 +20,6 @@ class ZCompensateInit:
 
         self.tri_expand_mm  = config.getfloat('tri_expand_mm', default=0.05, minval=-0.2, maxval=0.1)
         self.g29_down_min_z     = config.getfloat('g29_down_min_z', default=25, minval=5, maxval=500)
-        self.z_offset_cex_axis = config.getfloat('z_offset_cex_axis', default=3, minval=1, maxval=10)
         self.z_offset_move  = 0
         self.sys_max_velocity, self.sys_max_accel, self.sys_max_z_velocity, self.sys_max_z_accel = 0, 0, 0, 0
 
@@ -62,7 +61,6 @@ class ZCompensateInit:
         self.tri_z_up_spd       = config.getfloat('lift_speed', default=self.tri_z_down_spd * 1.0 , minval=0.1, maxval=100)
         self.rdy_xy_spd         = config.getfloat('rdy_xy_spd', default=250 , minval=1, maxval=1000)
         self.rdy_z_spd          = config.getfloat('rdy_z_spd', default=self.tri_z_up_spd, minval=1, maxval=50)
-        self.acc_ctl_mm         = config.getfloat('acc_ctl_mm', default=0.5, minval=0, maxval=10)
         self.low_spd_nul        = config.getint('low_spd_nul', 5, minval=1, maxval=10)
         self.send_step_duty     = config.getint('send_step_duty', 16, minval=0, maxval=10)
         self.run_max_velocity   = config.getfloat('run_max_velocity', default=500, minval=1, maxval=5000)
