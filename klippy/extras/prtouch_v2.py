@@ -28,7 +28,7 @@ class PRTouchEndstopWrapper:
         self.config = config
         self.printer = config.get_printer()
         self.shut_down = False
-        self.mm_per_step, self.pres_tri_time, self.step_tri_time, self.pres_tri_chs, self.pres_buf_cnt = 0, 0, 0, 0, 0
+        self.pres_tri_time, self.step_tri_time, self.pres_tri_chs, self.pres_buf_cnt = 0, 0, 0, 0
         self.mm_per_step = None
 
         self.public_step_res, self.pres_res = [], []
