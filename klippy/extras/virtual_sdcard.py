@@ -57,7 +57,6 @@ class VirtualSD:
         self.count_line = 0
         self.do_resume_status = False
         self.do_cancel_status = False
-        self.cancel_print_state = False
         self.power_loss_pause_flag = False
         self.pause_flag = 1  # 1 Pause during printing, 2 Suspension of preheating process after power failure
         self.fan_state = ""
