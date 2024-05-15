@@ -5,7 +5,6 @@
 # This file may be distributed under the terms of the GNU GPLv3 license.
 import logging
 import time
-import socket
 import math
 import random
 
@@ -58,7 +57,6 @@ class PRTouchEndstopWrapper:
         self.config = config
         self.printer = config.get_printer()
         self.steppers = []
-        self.dbg_msg = {}
         self.shut_down = False
         self.jump_probe_ready, self.has_save_sys_acc = False, False
         self.safe_move_z_tri_call_back, self.safe_move_z_all_cnt = None, 0
@@ -86,7 +84,6 @@ class PRTouchEndstopWrapper:
         self.tri_max_hold       = config.getint('tri_max_hold', default=(3072 if self.use_adc else 6000), minval=self.tri_min_hold, maxval=600000)
         # 2. Debug Cfg
         self.show_msg           = config.getboolean('show_msg', default=False)
-        self.tri_wave_ip        = config.get('tri_wave_ip', None)
         # 3. Shake Z Cfg
         self.shake_cnt          = config.getint('shake_cnt', default=8, minval=1, maxval=512)
         self.shake_range        = config.getint('shake_range', default=0.5, minval=0.1, maxval=2)
@@ -339,14 +336,6 @@ class PRTouchEndstopWrapper:
             return
         if title != 'SHOW_WAVE':
             self.gcode.respond_info('[' + title + ']' + msg)
-        if self.tri_wave_ip is None:
-            return
-        if title not in self.dbg_msg:
-            self.dbg_msg[title] = len(self.dbg_msg)
-        ss = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        ss.sendto((str(self.dbg_msg[title]) + '$' + title + '$' + time.strftime("%H:%M:%S ")  + '$' +  msg + '\n').encode(), (str(self.tri_wave_ip), 21021))
-        ss.close()
-        pass
 
     def print_ary(self, title, ary, lent=32, pt_cnt=2, force=False):
         st = '['

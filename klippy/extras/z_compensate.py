@@ -4,7 +4,6 @@
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
 import time
-import socket
 import random
 
 
@@ -20,14 +19,12 @@ class ZCompensateInit:
         self.printer        = config.get_printer()
         self.prtouch        = self.printer.lookup_object('prtouch_v2')
         self.gcode          = self.printer.lookup_object('gcode')
-        self.tri_wave_ip    = config.get('tri_wave_ip', None)
         self.shut_down = False
 
         self.tri_expand_mm  = config.getfloat('tri_expand_mm', default=0.05, minval=-0.2, maxval=0.1)
         self.g29_down_min_z     = config.getfloat('g29_down_min_z', default=25, minval=5, maxval=500)
         self.z_offset_cex_axis = config.getfloat('z_offset_cex_axis', default=3, minval=1, maxval=10)
         self.z_offset_move  = 0
-        self.dbg_msg = {}
         self.sys_max_velocity, self.sys_max_accel, self.sys_max_z_velocity, self.sys_max_z_accel = 0, 0, 0, 0
 
         self.gcode.register_command('Z_OFFSET_CALIBRATION', self.cmd_Z_OFFSET_CALIBRATION, desc=self.cmd_Z_OFFSET_CALIBRATION_help)
@@ -103,14 +100,6 @@ class ZCompensateInit:
             return
         if title != 'SHOW_WAVE':
             self.gcode.respond_info('[' + title + ']' + msg)
-        if self.tri_wave_ip is None:
-            return
-        if title not in self.dbg_msg:
-            self.dbg_msg[title] = len(self.dbg_msg)
-        ss = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        ss.sendto((str(self.dbg_msg[title]) + '$' + title + '$' + time.strftime("%H:%M:%S ")  + '$' +  msg + '\n').encode(), (str(self.tri_wave_ip), 21021))
-        ss.close()
-        pass
 
     def ck_and_raise_error(self, ck, err_code, vals=[]):
         if not ck:
