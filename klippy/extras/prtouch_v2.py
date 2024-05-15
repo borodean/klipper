@@ -9,12 +9,6 @@ import math
 import random
 
 
-# COMMANDS
-
-# FORCE_MOVE STEPPER=stepper_x DISTANCE=5 VELOCITY=10
-# PID_CALIBRATE HEATER=extruder TARGET=210
-# PID_CALIBRATE HEATER=heater_bed TARGET=60
-
 ERR_PRES_LOST_RUN_DATA      = 'The pressure data is lost when the probe is over and waiting for the data to be sent back'
 ERR_STEP_LOST_RUN_DATA      = 'The motor step data is lost when the probe is over and waiting for data return'
 
@@ -22,7 +16,6 @@ MAX_PRES_CNT = 4
 MAX_BUF_LEN = 32
 
 
-# PRTouch "endstop" wrapper
 class PRTouchEndstopWrapper:
     def __init__(self, config):
         self.config = config
