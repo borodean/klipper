@@ -14,7 +14,6 @@ PR_VERSION = 307
 
 # COMMANDS
 
-# TRIG_TEST C=10
 # SELF_CHECK_PRTOUCH
 # START_STEP_PRTOUCH DIR=1 SPD=10 DIS=10
 # NOZZLE_CLEAR HOT_MIN_TEMP=140 HOT_MAX_TEMP=260 BED_MAX_TEMP=100
@@ -152,7 +151,6 @@ class PRTouchEndstopWrapper:
         self.step_mcu.register_config_callback(self._build_step_config)
         self.pres_mcu.register_config_callback(self._build_pres_config)
 
-        self.gcode.register_command('TRIG_TEST', self.cmd_TRIG_TEST, desc=self.cmd_TRIG_TEST_help)
         self.gcode.register_command('CHECK_BED_MESH', self.cmd_CHECK_BED_MESH, desc=self.cmd_CHECK_BED_MESH_help)
         self.gcode.register_command('PRTOUCH_READY', self.cmd_PRTOUCH_READY, desc=self.cmd_PRTOUCH_READY_help)
         self.gcode.register_command('NOZZLE_CLEAR', self.cmd_NOZZLE_CLEAR, desc=self.cmd_NOZZLE_CLEAR_help)
@@ -1039,13 +1037,6 @@ class PRTouchEndstopWrapper:
             self.public_start_step_prtouch_cmd.send([self.public_step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
             self.start_pres_prtouch_cmd.send([self.public_pres_oid, 0, 0, 0, 0, 0, 0, 0, 0])
             self._ck_and_manual_get_step()
-
-    cmd_TRIG_TEST_help = "Test The Tri is Normal"
-    def cmd_TRIG_TEST(self, gcmd):
-        self.public_enable_steps()
-        self.public_get_mm_per_step()
-        run_cnt = gcmd.get_int('C', 1)
-        self.public_run_step_prtouch(20, 0, False, run_cnt, run_cnt, True) # (self.max_z*1.2, 0, False, run_cnt, run_cnt, True)
 
     cmd_SELF_CHECK_PRTOUCH_help = "Self check the pres."
     def cmd_SELF_CHECK_PRTOUCH(self, gcmd):
