@@ -4,10 +4,6 @@
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
 import os, re, logging, collections, shlex
-import sys
-if sys.version_info.major == 2:
-    reload(sys)
-    sys.setdefaultencoding('utf8')
 
 class CommandError(Exception):
     pass
@@ -226,8 +222,6 @@ class GCodeDispatch:
                 if not need_ack:
                     raise
             gcmd.ack()
-            if line.startswith("G1") or line.startswith("G0"):
-                pass
     def run_script_from_command(self, script):
         self._process_commands(script.split('\n'), need_ack=False)
     def run_script(self, script):
@@ -280,9 +274,6 @@ class GCodeDispatch:
     # G-Code special command handlers
     def cmd_default(self, gcmd):
         cmd = gcmd.get_command()
-        if cmd == 'M5':
-            # return if M5 gcode_marco not exists
-            return
         if cmd == 'M105':
             # Don't warn about temperature requests when not ready
             gcmd.ack("T:0")
