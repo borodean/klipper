@@ -58,15 +58,15 @@ class PRTouchEndstopWrapper:
         self.ver_step, self.ver_pres, self.ver_prth = 'V0.0', 'V0.0', ('V' + str(PR_VERSION / 100))
         self.sys_max_velocity, self.sys_max_accel, self.sys_max_z_velocity, self.sys_max_z_accel = 0, 0, 0, 0
 
-        self.step_res, self.pres_res = [], []
-        self.read_swap_prtouch_cmd, self.start_step_prtouch_cmd = None, None
-        self.write_swap_prtouch_cmd, self.read_pres_prtouch_cmd, self.start_pres_prtouch_cmd = None, None, None
+        self.public_step_res, self.pres_res = [], []
+        self.public_read_swap_prtouch_cmd, self.public_start_step_prtouch_cmd = None, None
+        self.public_write_swap_prtouch_cmd, self.read_pres_prtouch_cmd, self.start_pres_prtouch_cmd = None, None, None
         self.bed_mesh, self.toolhead, self.bed_mesh, self.pheaters, self.heater_hot, self.heater_bed = None, None, None, None, None, None
         # 0. Base Cfg
         self.use_adc            = config.getboolean('use_adc', default=False)
         # 1. Tri Cfg
         self.tri_acq_ms         = config.getint('tri_acq_ms', default=(1 if self.use_adc else 12), minval=1, maxval=1000)
-        self.tri_send_ms        = config.getint('tri_send_ms', default=10, minval=1, maxval=1000)
+        self.public_tri_send_ms        = config.getint('tri_send_ms', default=10, minval=1, maxval=1000)
         self.tri_need_cnt       = config.getint('tri_need_cnt', default=1, minval=1, maxval=MAX_PRES_CNT)
         self.tri_hftr_cut       = config.getfloat('tri_hftr_cut', default=2, minval=0.01, maxval=100.)
         self.cal_hftr_cut       = config.getfloat('cal_hftr_cut', default=10, minval=0.01, maxval=100.)
@@ -151,7 +151,7 @@ class PRTouchEndstopWrapper:
         if self.step_swap_pin and self.pres_swap_pin:
             self.step_mcu = self.ppins.parse_pin(self.step_swap_pin, True, True)['chip']
             self.pres_mcu = self.ppins.parse_pin(self.pres_swap_pin, True, True)['chip']
-        self.step_oid, self.pres_oid = self.step_mcu.create_oid(), self.pres_mcu.create_oid()
+        self.public_step_oid, self.public_pres_oid = self.step_mcu.create_oid(), self.pres_mcu.create_oid()
 
         self.step_mcu.register_config_callback(self._build_step_config)
         self.pres_mcu.register_config_callback(self._build_pres_config)
@@ -170,12 +170,12 @@ class PRTouchEndstopWrapper:
         self.gcode.register_command('SELF_CHECK_PRTOUCH', self.cmd_SELF_CHECK_PRTOUCH, desc=self.cmd_SELF_CHECK_PRTOUCH_help)
         self.gcode.register_command('START_STEP_PRTOUCH', self.cmd_START_STEP_PRTOUCH, desc=self.cmd_START_STEP_PRTOUCH_help)
 
-        self.step_mcu.register_response(self._handle_step_debug_prtouch, "debug_prtouch", self.step_oid)
-        self.step_mcu.register_response(self._handle_result_run_step_prtouch, "result_run_step_prtouch", self.step_oid)
+        self.step_mcu.register_response(self._handle_step_debug_prtouch, "debug_prtouch", self.public_step_oid)
+        self.step_mcu.register_response(self._handle_result_run_step_prtouch, "result_run_step_prtouch", self.public_step_oid)
 
-        self.pres_mcu.register_response(self._handle_pres_debug_prtouch, "debug_prtouch", self.pres_oid)
-        self.pres_mcu.register_response(self._handle_result_run_pres_prtouch, "result_run_pres_prtouch", self.pres_oid)
-        self.pres_mcu.register_response(self._handle_result_read_pres_prtouch, "result_read_pres_prtouch", self.pres_oid)
+        self.pres_mcu.register_response(self._handle_pres_debug_prtouch, "debug_prtouch", self.public_pres_oid)
+        self.pres_mcu.register_response(self._handle_result_run_pres_prtouch, "result_run_pres_prtouch", self.public_pres_oid)
+        self.pres_mcu.register_response(self._handle_result_read_pres_prtouch, "result_read_pres_prtouch", self.public_pres_oid)
 
     def _build_step_config(self):
         self.bed_mesh   = self.printer.lookup_object('bed_mesh')
@@ -202,41 +202,41 @@ class PRTouchEndstopWrapper:
                         [max_x, min_y, 0 if (not self.stored_profs or not self.need_measure_gap) else self.stored_profs.getfloat('z_gap_10', default=0, minval=0, maxval=1)]]
 
         self.step_mcu.add_config_cmd('config_step_prtouch oid=%d step_cnt=%d swap_pin=%s sys_time_duty=%u'
-                                     % (self.step_oid, len(self.z_step_pins), self.ppins.parse_pin(self.step_swap_pin, True, True)['pin'], int(self.sys_time_duty * 100000)))
+                                     % (self.public_step_oid, len(self.z_step_pins), self.ppins.parse_pin(self.step_swap_pin, True, True)['pin'], int(self.sys_time_duty * 100000)))
 
         for i in range(len(self.z_step_pins)):
             step_par = self.ppins.parse_pin(self.z_step_pins[i], True, True)
             dir_par = self.ppins.parse_pin(self.z_dir_pins[i], True, True)
             if self.is_corexz:
                 if i == 0:
-                    self.step_mcu.add_config_cmd('add_step_prtouch oid=%d index=%d dir_pin=%s step_pin=%s dir_invert=%d step_invert=%d' % (self.step_oid, i, dir_par['pin'], step_par['pin'], not dir_par['invert'], step_par['invert']))
+                    self.step_mcu.add_config_cmd('add_step_prtouch oid=%d index=%d dir_pin=%s step_pin=%s dir_invert=%d step_invert=%d' % (self.public_step_oid, i, dir_par['pin'], step_par['pin'], not dir_par['invert'], step_par['invert']))
                 else:
-                    self.step_mcu.add_config_cmd('add_step_prtouch oid=%d index=%d dir_pin=%s step_pin=%s dir_invert=%d step_invert=%d' % (self.step_oid, i, dir_par['pin'], step_par['pin'], dir_par['invert'], step_par['invert']))
+                    self.step_mcu.add_config_cmd('add_step_prtouch oid=%d index=%d dir_pin=%s step_pin=%s dir_invert=%d step_invert=%d' % (self.public_step_oid, i, dir_par['pin'], step_par['pin'], dir_par['invert'], step_par['invert']))
             else:
-                self.step_mcu.add_config_cmd('add_step_prtouch oid=%d index=%d dir_pin=%s step_pin=%s dir_invert=%d step_invert=%d' % (self.step_oid, i, dir_par['pin'], step_par['pin'], dir_par['invert'], step_par['invert']))
+                self.step_mcu.add_config_cmd('add_step_prtouch oid=%d index=%d dir_pin=%s step_pin=%s dir_invert=%d step_invert=%d' % (self.public_step_oid, i, dir_par['pin'], step_par['pin'], dir_par['invert'], step_par['invert']))
 
-        self.read_swap_prtouch_cmd = self.step_mcu.lookup_query_command('read_swap_prtouch oid=%c', 'result_read_swap_prtouch oid=%c sta=%c', oid=self.step_oid)
-        self.start_step_prtouch_cmd = self.step_mcu.lookup_command('start_step_prtouch oid=%c dir=%c send_ms=%c step_cnt=%u step_us=%u acc_ctl_cnt=%u low_spd_nul=%c send_step_duty=%c auto_rtn=%c', cq=None)
-        self.manual_get_steps_cmd = self.step_mcu.lookup_query_command('manual_get_steps oid=%c index=%c', 'result_manual_get_steps oid=%c index=%c tri_time=%u tick0=%u tick1=%u tick2=%u tick3=%u step0=%u step1=%u step2=%u step3=%u', oid=self.step_oid)
+        self.public_read_swap_prtouch_cmd = self.step_mcu.lookup_query_command('read_swap_prtouch oid=%c', 'result_read_swap_prtouch oid=%c sta=%c', oid=self.public_step_oid)
+        self.public_start_step_prtouch_cmd = self.step_mcu.lookup_command('start_step_prtouch oid=%c dir=%c send_ms=%c step_cnt=%u step_us=%u acc_ctl_cnt=%u low_spd_nul=%c send_step_duty=%c auto_rtn=%c', cq=None)
+        self.manual_get_steps_cmd = self.step_mcu.lookup_query_command('manual_get_steps oid=%c index=%c', 'result_manual_get_steps oid=%c index=%c tri_time=%u tick0=%u tick1=%u tick2=%u tick3=%u step0=%u step1=%u step2=%u step3=%u', oid=self.public_step_oid)
 
     def _build_pres_config(self):
         self.pres_mcu.add_config_cmd('config_pres_prtouch oid=%d use_adc=%d pres_cnt=%d swap_pin=%s sys_time_duty=%u'
-                                     % (self.pres_oid, self.use_adc, self.pres_cnt, self.ppins.parse_pin(self.pres_swap_pin, True, True)['pin'], int(self.sys_time_duty * 100000)))
+                                     % (self.public_pres_oid, self.use_adc, self.pres_cnt, self.ppins.parse_pin(self.pres_swap_pin, True, True)['pin'], int(self.sys_time_duty * 100000)))
         for i in range(self.pres_cnt):
             if self.use_adc:
                 adc_par = self.ppins.parse_pin(self.pres_adc_pins[i], True, True)
-                self.pres_mcu.add_config_cmd('add_pres_prtouch oid=%d index=%d clk_pin=%s sda_pin=%s' % (self.pres_oid, i, adc_par['pin'], adc_par['pin']))
+                self.pres_mcu.add_config_cmd('add_pres_prtouch oid=%d index=%d clk_pin=%s sda_pin=%s' % (self.public_pres_oid, i, adc_par['pin'], adc_par['pin']))
             else:
                 clk_par = self.ppins.parse_pin(self.pres_clk_pins[i], True, True)
                 sdo_par = self.ppins.parse_pin(self.pres_sdo_pins[i], True, True)
-                self.pres_mcu.add_config_cmd('add_pres_prtouch oid=%d index=%d clk_pin=%s sda_pin=%s' % (self.pres_oid, i, clk_par['pin'], sdo_par['pin']))
+                self.pres_mcu.add_config_cmd('add_pres_prtouch oid=%d index=%d clk_pin=%s sda_pin=%s' % (self.public_pres_oid, i, clk_par['pin'], sdo_par['pin']))
 
-        self.write_swap_prtouch_cmd = self.pres_mcu.lookup_query_command('write_swap_prtouch oid=%c sta=%c', 'resault_write_swap_prtouch oid=%c', oid=self.pres_oid)
+        self.public_write_swap_prtouch_cmd = self.pres_mcu.lookup_query_command('write_swap_prtouch oid=%c sta=%c', 'resault_write_swap_prtouch oid=%c', oid=self.public_pres_oid)
         self.read_pres_prtouch_cmd = self.pres_mcu.lookup_command('read_pres_prtouch oid=%c acq_ms=%u cnt=%u', cq=None)
         self.start_pres_prtouch_cmd = self.pres_mcu.lookup_command('start_pres_prtouch oid=%c tri_dir=%c acq_ms=%c send_ms=%c need_cnt=%c tri_hftr_cut=%u tri_lftr_k1=%u min_hold=%u max_hold=%u', cq=None)
-        self.deal_avgs_prtouch_cmd = self.pres_mcu.lookup_query_command('deal_avgs_prtouch oid=%c base_cnt=%c', 'result_deal_avgs_prtouch oid=%c ch0=%i ch1=%i ch2=%i ch3=%i', oid=self.pres_oid)
+        self.deal_avgs_prtouch_cmd = self.pres_mcu.lookup_query_command('deal_avgs_prtouch oid=%c base_cnt=%c', 'result_deal_avgs_prtouch oid=%c ch0=%i ch1=%i ch2=%i ch3=%i', oid=self.public_pres_oid)
 
-        self.manual_get_pres_cmd = self.pres_mcu.lookup_query_command('manual_get_pres oid=%c index=%c', 'resault_manual_get_pres oid=%c index=%c tri_time=%u tri_chs=%c buf_cnt=%u tick_0=%u ch0_0=%i ch1_0=%i ch2_0=%i ch3_0=%i tick_1=%u ch0_1=%i ch1_1=%i ch2_1=%i ch3_1=%i', oid=self.pres_oid)
+        self.manual_get_pres_cmd = self.pres_mcu.lookup_query_command('manual_get_pres oid=%c index=%c', 'resault_manual_get_pres oid=%c index=%c tri_time=%u tri_chs=%c buf_cnt=%u tick_0=%u ch0_0=%i ch1_0=%i ch2_0=%i ch3_0=%i tick_1=%u ch0_1=%i ch1_1=%i ch2_1=%i ch3_1=%i', oid=self.public_pres_oid)
 
     def _handle_step_debug_prtouch(self, params):
         self.ver_step = 'V' + str(params['version'] / 100)
@@ -245,9 +245,9 @@ class PRTouchEndstopWrapper:
         self.step_tri_time = params['tri_time'] / 10000.
         for i in range(4):
             sdir = {'tick': params['tick%d' % i] / 10000., 'step': params['step%d' % i], 'index': params['index']}
-            self.step_res.append(sdir)
-        if self.safe_move_z_tri_call_back is not None and len(self.step_res) == MAX_BUF_LEN:
-            run_dis = (self.safe_move_z_all_cnt - self.step_res[-1]['step']) * self.mm_per_step
+            self.public_step_res.append(sdir)
+        if self.safe_move_z_tri_call_back is not None and len(self.public_step_res) == MAX_BUF_LEN:
+            run_dis = (self.safe_move_z_all_cnt - self.public_step_res[-1]['step']) * self.mm_per_step
             self.safe_move_z_tri_call_back(run_dis)
             self.safe_move_z_tri_call_back = None
             self._print_msg('SAFE_MOVE_Z', 'tri_dis = %f' % run_dis, True)
@@ -282,9 +282,9 @@ class PRTouchEndstopWrapper:
 
     def _print_res(self):
         t_buf, p_buf = [], []
-        for i in range(len(self.step_res)):
-            t_buf.append(self.step_res[i]['tick'])
-            p_buf.append(self.step_res[i]['step'])
+        for i in range(len(self.public_step_res)):
+            t_buf.append(self.public_step_res[i]['tick'])
+            p_buf.append(self.public_step_res[i]['step'])
         self._print_ary('STEP_TICK', t_buf, len(t_buf))
         self._print_ary('STEP_DATA', p_buf, len(p_buf))
 
@@ -302,17 +302,17 @@ class PRTouchEndstopWrapper:
     def _ck_and_raise_error(self, ck, err, vals=[]):
         if not ck:
             return
-        self.enable_steps()
+        self.public_enable_steps()
         now_pos = self.toolhead.get_position()
-        step_cnt, step_us, acc_ctl_cnt = self.get_step_cnts(self.g29_down_min_z, self.tri_z_down_spd)
-        self.start_step_prtouch_cmd.send([self.step_oid, 1, self.tri_send_ms, step_cnt, step_us, acc_ctl_cnt, self.low_spd_nul, self.send_step_duty, 0])
+        step_cnt, step_us, acc_ctl_cnt = self.public_get_step_cnts(self.g29_down_min_z, self.tri_z_down_spd)
+        self.public_start_step_prtouch_cmd.send([self.public_step_oid, 1, self.public_tri_send_ms, step_cnt, step_us, acc_ctl_cnt, self.low_spd_nul, self.send_step_duty, 0])
         t_last = time.time()
-        while (time.time() - t_last < 20) and (len(self.step_res) != MAX_BUF_LEN):
+        while (time.time() - t_last < 20) and (len(self.public_step_res) != MAX_BUF_LEN):
             self._delay_s(0.010)
-        self.start_step_prtouch_cmd.send([self.step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
+        self.public_start_step_prtouch_cmd.send([self.public_step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
         self.toolhead.set_position(now_pos[:2] + [0, now_pos[3]], homing_axes=[2])
 
-        self.disable_steps()
+        self.public_disable_steps()
         msg = err % tuple(vals)
         self._print_msg('RAISE_ERROR', msg, True)
         shutdown_msg = 'Shutdown due to ' + msg
@@ -358,7 +358,7 @@ class PRTouchEndstopWrapper:
             self.toolhead.kin.max_z_accel = self.run_max_z_accel
             self.has_save_sys_acc = True
 
-    def enable_steps(self):
+    def public_enable_steps(self):
         self._print_msg('ENABLE_STEPS', 'Start enable_steps()...')
         for stepper in self.toolhead.get_kinematics().get_steppers():
             print_time = self.toolhead.get_last_move_time()
@@ -370,7 +370,7 @@ class PRTouchEndstopWrapper:
                 self.toolhead.dwell(0.100)
                 self._delay_s(0.5)
 
-    def disable_steps(self):
+    def public_disable_steps(self):
         self._print_msg('DISABLE_STEPS', 'Start disable_steps()...')
         for stepper in self.toolhead.get_kinematics().get_steppers():
             print_time = self.toolhead.get_last_move_time()
@@ -382,7 +382,7 @@ class PRTouchEndstopWrapper:
                 self.toolhead.dwell(0.100)
                 self._delay_s(0.5)
 
-    def move(self, pos, speed, wait=True):
+    def public_move(self, pos, speed, wait=True):
 
         if not self.shut_down:
             gcmd = 'G1 F%d X%.3f Y%.3f Z%.3f' % (speed * 60, pos[0], pos[1], pos[2]) if len(pos) >= 3 else 'G1 F%d X%.3f Y%.3f' % (speed * 60, pos[0], pos[1])
@@ -430,25 +430,25 @@ class PRTouchEndstopWrapper:
             self.gcode.run_script_from_command('G1 X%.2f Y%.2f Z%.2f F%d' % (now_pos[0] - self.shake_range, now_pos[1] + self.shake_range, now_pos[2] + self.shake_range / 2, int(60 * max_z_velocity * 0.25)))
             while len(self.toolhead.move_queue.queue) >= 5:
                 self._delay_s(0.010)
-        self.move(now_pos, self.rdy_z_spd)
+        self.public_move(now_pos, self.rdy_z_spd)
 
     def _ck_and_manual_get_step(self):
-        if len(self.step_res) == MAX_BUF_LEN:
+        if len(self.public_step_res) == MAX_BUF_LEN:
             return
-        self._ck_and_raise_error(len(self.step_res) < MAX_BUF_LEN / 4, ERR_STEP_LOST_RUN_DATA, [len(self.step_res)])
-        self._print_msg('CK_AND_MANUAL_GET_STEP', 'need=%d, recv=%d' % (MAX_BUF_LEN, len(self.step_res)))
+        self._ck_and_raise_error(len(self.public_step_res) < MAX_BUF_LEN / 4, ERR_STEP_LOST_RUN_DATA, [len(self.public_step_res)])
+        self._print_msg('CK_AND_MANUAL_GET_STEP', 'need=%d, recv=%d' % (MAX_BUF_LEN, len(self.public_step_res)))
 
         for i in range(0, MAX_BUF_LEN, 4):
-            if len(self.step_res) > i and self.step_res[i]['index'] == i:
+            if len(self.public_step_res) > i and self.public_step_res[i]['index'] == i:
                 continue
             self._print_msg('CK_AND_MANUAL_GET_STEP', 'Re trans index=%d' % i)
-            params = self.manual_get_steps_cmd.send([self.step_oid, i])
+            params = self.manual_get_steps_cmd.send([self.public_step_oid, i])
             self.step_tri_time = params['tri_time'] / 10000.
             for j in range(4):
                 sdir = {'tick': params['tick%d' % j] / 10000., 'step': params['step%d' % j], 'index': params['index']}
-                self.step_res.insert(i + j, sdir)
+                self.public_step_res.insert(i + j, sdir)
 
-        self._ck_and_raise_error(len(self.step_res) != MAX_BUF_LEN, ERR_STEP_LOST_RUN_DATA, [len(self.step_res)])
+        self._ck_and_raise_error(len(self.public_step_res) != MAX_BUF_LEN, ERR_STEP_LOST_RUN_DATA, [len(self.public_step_res)])
 
     def _ck_and_manual_get_pres(self):
         if len(self.pres_res) == MAX_BUF_LEN:
@@ -460,7 +460,7 @@ class PRTouchEndstopWrapper:
             if len(self.pres_res) > i and self.pres_res[i]['index'] == i:
                 continue
             self._print_msg('CK_AND_MANUAL_GET_PRES', 'Re trans index=%d' % i)
-            params = self.manual_get_pres_cmd.send([self.step_oid, i])
+            params = self.manual_get_pres_cmd.send([self.public_step_oid, i])
             self.pres_tri_time = params['tri_time'] / 10000.
             self.pres_tri_chs = params['tri_chs']
             self.pres_buf_cnt = params['buf_cnt']
@@ -554,16 +554,16 @@ class PRTouchEndstopWrapper:
         self._print_ary('OUT_MMS', out_mms, len(out_mms), 2)
         return sum(out_mms) / len(out_mms) # out_val_mm
 
-    def get_step_cnts(self, run_dis, run_spd):
+    def public_get_step_cnts(self, run_dis, run_spd):
         if not self.mm_per_step:
-            self.get_mm_per_step()
+            self.public_get_mm_per_step()
         step_cnt = int(run_dis / self.mm_per_step)
         step_us = int(((run_dis / run_spd) * 1000 * 1000) / step_cnt)
         acc_ctl_cnt = int(self.acc_ctl_mm / self.mm_per_step)
         self._print_msg('GET_STEP_CNTS', 'run_dis=%.2f, run_spd=%.2f, step_cnt=%d, step_us=%d acc_ctl_cnt=%d' % (run_dis, run_spd, step_cnt, step_us, acc_ctl_cnt))
         return step_cnt, step_us, acc_ctl_cnt
 
-    def get_mm_per_step(self):
+    def public_get_mm_per_step(self):
         if self.mm_per_step:
             return
         for stepper in self.toolhead.get_kinematics().get_steppers():
@@ -573,10 +573,10 @@ class PRTouchEndstopWrapper:
 
     def _env_self_check(self, force=False):
         # 1. PR_ERR_CODE_SWAP_PIN_DETECTI
-        self.write_swap_prtouch_cmd.send([self.pres_oid, 0])
-        params0 = self.read_swap_prtouch_cmd.send([self.step_oid])
-        self.write_swap_prtouch_cmd.send([self.pres_oid, 1])
-        params1 = self.read_swap_prtouch_cmd.send([self.step_oid])
+        self.public_write_swap_prtouch_cmd.send([self.public_pres_oid, 0])
+        params0 = self.public_read_swap_prtouch_cmd.send([self.public_step_oid])
+        self.public_write_swap_prtouch_cmd.send([self.public_pres_oid, 1])
+        params1 = self.public_read_swap_prtouch_cmd.send([self.public_step_oid])
         self._ck_and_raise_error(not params0 or not params1 or params0['sta'] != 0 or params1['sta'] != 1,
                                 ERR_SWAP_PIN_DETECTI, [self.pres_swap_pin, self.step_swap_pin])
         self._print_msg('DEBUG', '--Self Test 1 = PR_ERR_CODE_SWAP_PIN_DETECTI, Pass!!--', force)
@@ -585,13 +585,13 @@ class PRTouchEndstopWrapper:
             return
 
         # 2. PR_ERR_CODE_PRES_READ_DATA_TIMEOUT
-        self.deal_avgs_prtouch_cmd.send([self.pres_oid, 0])
+        self.deal_avgs_prtouch_cmd.send([self.public_pres_oid, 0])
         self.pres_res = []
-        self.read_pres_prtouch_cmd.send([self.pres_oid, self.tri_acq_ms, 32 + 8])
+        self.read_pres_prtouch_cmd.send([self.public_pres_oid, self.tri_acq_ms, 32 + 8])
         start_tick_s = time.time()
         while ((time.time() - start_tick_s) < (1.5 * (self.tri_acq_ms / 1000.) * 64)) and len(self.pres_res) < 32:
             self._delay_s(0.010)
-        self.read_pres_prtouch_cmd.send([self.pres_oid, self.tri_acq_ms, 0])
+        self.read_pres_prtouch_cmd.send([self.public_pres_oid, self.tri_acq_ms, 0])
         self._ck_and_raise_error(len(self.pres_res) < 32, ERR_PRES_READ_DATA_TIMEOUT, [32, len(self.pres_res)])
 
         pnt_tick, pnt_vals = [], [[], [], [], []]
@@ -625,16 +625,16 @@ class PRTouchEndstopWrapper:
         self._print_msg('DEBUG', '--Self Test 4 = PR_ERR_CODE_PRES_NOISE_TOO_BIG, Pass!!--', force=force)
 
         # 4. PR_ERR_CODE_PRES_NOT_BE_SENSED
-        self.enable_steps()
-        self.deal_avgs_prtouch_cmd.send([self.pres_oid, 16])
+        self.public_enable_steps()
+        self.deal_avgs_prtouch_cmd.send([self.public_pres_oid, 16])
         now_pos = self.toolhead.get_position()
         self.toolhead.set_position(now_pos[:2] + [0, now_pos[3]], homing_axes=[2])
         self.pres_res = []
-        self.read_pres_prtouch_cmd.send([self.pres_oid, self.tri_acq_ms, 32 + 8])
+        self.read_pres_prtouch_cmd.send([self.public_pres_oid, self.tri_acq_ms, 32 + 8])
         self._shake_motor(self.shake_cnt)
         while ((time.time() - start_tick_s) < (1.5 * (self.tri_acq_ms / 1000.) * 64)) and len(self.pres_res) < 32:
             self._delay_s(0.010)
-        self.read_pres_prtouch_cmd.send([self.pres_oid, self.tri_acq_ms, 0])
+        self.read_pres_prtouch_cmd.send([self.public_pres_oid, self.tri_acq_ms, 0])
         self._ck_and_raise_error(len(self.pres_res) < 32, ERR_PRES_READ_DATA_TIMEOUT, [32, len(self.pres_res)])
         pnt_tick, pnt_vals = [], [[], [], [], []]
         for i in range(4, len(self.pres_res) - 4):
@@ -657,11 +657,11 @@ class PRTouchEndstopWrapper:
         for i in range(len(self.rdy_pos)):
             self.rdy_pos[i][2] = self.bed_max_err
         now_pos = self.toolhead.get_position()
-        self.move(now_pos[:2] + [self.bed_max_err, now_pos[3]], self.rdy_z_spd)
+        self.public_move(now_pos[:2] + [self.bed_max_err, now_pos[3]], self.rdy_z_spd)
         for i in range(4):
             self._print_msg('PROBE_READY', 'Start Probe Point=%s' % str(self.rdy_pos[i]))
-            self.move(self.rdy_pos[i], self.rdy_xy_spd)
-            self.rdy_pos[i][2] = self.run_step_prtouch(self.g29_down_min_z, self.probe_min_3err, True, 5, 3, True)
+            self.public_move(self.rdy_pos[i], self.rdy_xy_spd)
+            self.rdy_pos[i][2] = self.public_run_step_prtouch(self.g29_down_min_z, self.probe_min_3err, True, 5, 3, True)
         self._print_msg('RDY_POS', "[00=%.2f, 01=%.2f, 11=%.2f, 10=%.2f]" % (self.rdy_pos[0][2], self.rdy_pos[1][2], self.rdy_pos[2][2], self.rdy_pos[3][2]))
         return True
 
@@ -672,27 +672,27 @@ class PRTouchEndstopWrapper:
 
         self.safe_move_z_tri_call_back = tri_call_back
 
-        self.start_step_prtouch_cmd.send([self.step_oid, run_dir, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
-        self.start_pres_prtouch_cmd.send([self.pres_oid, run_dir, 0, 0, 0, 0, 0, 0, 0])
+        self.public_start_step_prtouch_cmd.send([self.public_step_oid, run_dir, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
+        self.start_pres_prtouch_cmd.send([self.public_pres_oid, run_dir, 0, 0, 0, 0, 0, 0, 0])
 
         if run_sta == 1:
-            self.step_res, self.pres_res = [], []
-            self.enable_steps()
+            self.public_step_res, self.pres_res = [], []
+            self.public_enable_steps()
             if run_spd == 0 or run_dis == 0 or run_rdo == 0:
                 return
 
-            self.deal_avgs_prtouch_cmd.send([self.pres_oid, 8])
-            step_cnt, step_us, acc_ctl = self.get_step_cnts(run_dis, run_spd)
+            self.deal_avgs_prtouch_cmd.send([self.public_pres_oid, 8])
+            step_cnt, step_us, acc_ctl = self.public_get_step_cnts(run_dis, run_spd)
 
             if step_cnt == 0 or step_us == 0 or acc_ctl == 0:
                 return
             self.safe_move_z_all_cnt = step_cnt
-            self.start_pres_prtouch_cmd.send([self.pres_oid, run_dir, self.tri_acq_ms, self.tri_send_ms, self.tri_need_cnt,
+            self.start_pres_prtouch_cmd.send([self.public_pres_oid, run_dir, self.tri_acq_ms, self.public_tri_send_ms, self.tri_need_cnt,
                                               int(self.tri_hftr_cut * 1000), int(self.tri_lftr_k1 * 1000) if self.use_adc else int(self.tri_lftr_k1 * 1000 / run_rdo),
                                               self.tri_min_hold if self.use_adc else int(self.tri_min_hold * run_rdo), self.tri_max_hold if self.use_adc else int(self.tri_max_hold * run_rdo)])
-            self.start_step_prtouch_cmd.send([self.step_oid, run_dir, self.tri_send_ms, step_cnt, step_us, acc_ctl, self.low_spd_nul, self.send_step_duty, 0])
+            self.public_start_step_prtouch_cmd.send([self.public_step_oid, run_dir, self.public_tri_send_ms, step_cnt, step_us, acc_ctl, self.low_spd_nul, self.send_step_duty, 0])
 
-    def run_step_prtouch(self, down_min_z, probe_min_3err, rt_last=False, pro_cnt=3, crt_cnt=3, fast_probe=False, tri_min_hold=None, tri_max_hold=None):
+    def public_run_step_prtouch(self, down_min_z, probe_min_3err, rt_last=False, pro_cnt=3, crt_cnt=3, fast_probe=False, tri_min_hold=None, tri_max_hold=None):
         if not tri_min_hold or not tri_max_hold:
             tri_min_hold = self.tri_min_hold
             tri_max_hold = self.tri_max_hold
@@ -703,32 +703,32 @@ class PRTouchEndstopWrapper:
         self._print_msg('RUN_STEP_PRTOUCH', 'down_min_z=%f, probe_min_3err=%f, rt_last=%d, pro_cnt=%d, crt_cnt=%d, fast_probe=%d, tri_min_hold=%d, tri_max_hold=%d' %
                        (down_min_z, probe_min_3err, rt_last, pro_cnt, crt_cnt, fast_probe, tri_min_hold, tri_max_hold))
         for i in range(pro_cnt):
-            self.step_res, self.pres_res = [], []
-            self.deal_avgs_prtouch_cmd.send([self.pres_oid, 8])
-            step_cnt_down, step_us_down, acc_ctl_cnt = self.get_step_cnts(self.g29_down_min_z, self.tri_z_down_spd)
+            self.public_step_res, self.pres_res = [], []
+            self.deal_avgs_prtouch_cmd.send([self.public_pres_oid, 8])
+            step_cnt_down, step_us_down, acc_ctl_cnt = self.public_get_step_cnts(self.g29_down_min_z, self.tri_z_down_spd)
             step_us_down = int(step_us_down * 0.8) if (i == 0 and not self.use_adc) else step_us_down
-            self.start_pres_prtouch_cmd.send([self.pres_oid, 0, self.tri_acq_ms, self.tri_send_ms, self.tri_need_cnt,
+            self.start_pres_prtouch_cmd.send([self.public_pres_oid, 0, self.tri_acq_ms, self.public_tri_send_ms, self.tri_need_cnt,
                                               int(self.tri_hftr_cut * 1000), int(self.tri_lftr_k1 * 1000) if self.use_adc else int(self.tri_lftr_k1 * 1000 / tri_base_radio),
                                               tri_min_hold if self.use_adc else int(tri_min_hold * tri_base_radio), tri_max_hold if self.use_adc else int(tri_max_hold * tri_base_radio)])
-            self.start_step_prtouch_cmd.send([self.step_oid, 0, self.tri_send_ms, step_cnt_down, step_us_down, acc_ctl_cnt, self.low_spd_nul, self.send_step_duty, 0])
+            self.public_start_step_prtouch_cmd.send([self.public_step_oid, 0, self.public_tri_send_ms, step_cnt_down, step_us_down, acc_ctl_cnt, self.low_spd_nul, self.send_step_duty, 0])
             t_last = time.time()
-            while (time.time() - t_last < (down_min_z / self.tri_z_down_spd + 10)) and (len(self.step_res) != MAX_BUF_LEN or len(self.pres_res) != MAX_BUF_LEN):
+            while (time.time() - t_last < (down_min_z / self.tri_z_down_spd + 10)) and (len(self.public_step_res) != MAX_BUF_LEN or len(self.pres_res) != MAX_BUF_LEN):
                 self._delay_s(0.010)
-            self.start_step_prtouch_cmd.send([self.step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
-            self.start_pres_prtouch_cmd.send([self.pres_oid, 0, 0, 0, 0, 0, 0, 0, 0])
+            self.public_start_step_prtouch_cmd.send([self.public_step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
+            self.start_pres_prtouch_cmd.send([self.public_pres_oid, 0, 0, 0, 0, 0, 0, 0, 0])
             self._ck_and_manual_get_step()
             self._ck_and_manual_get_pres()
             tri_base_radio += (0 if (self.pres_buf_cnt >= (MAX_BUF_LEN / 2) or self.use_adc) else 0.25)
             self._print_msg('RUN_STEP_PRTOUCH', 'pres_buf_cnt = %d, tri_base_radio = %f' % (self.pres_buf_cnt, tri_base_radio))
-            step_par_down, pres_par_down = list(self.step_res), list(self.pres_res)
+            step_par_down, pres_par_down = list(self.public_step_res), list(self.pres_res)
             res_z.append(self._cal_tri_data(step_cnt_down, now_pos[2], step_par_down, pres_par_down, -lost_min_cnt * self.mm_per_step))
 
             can_rt = bool(i == 1 and not self.use_adc and math.fabs(res_z[0] - res_z[1]) < 0.05 and crt_cnt != pro_cnt)
             can_rt = True if (can_rt and tri_base_radio <= 1.0) else (i == (crt_cnt - 1)) and (max(res_z) - min(res_z) <= probe_min_3err)
 
-            up_min_z = (step_cnt_down - self.step_res[-1]['step']) * self.mm_per_step
-            step_cnt_up, step_us_up, acc_ctl_cnt = self.get_step_cnts(up_min_z, self.tri_z_up_spd)
-            step_cnt_up = int(step_cnt_down - self.step_res[-1]['step'])
+            up_min_z = (step_cnt_down - self.public_step_res[-1]['step']) * self.mm_per_step
+            step_cnt_up, step_us_up, acc_ctl_cnt = self.public_get_step_cnts(up_min_z, self.tri_z_up_spd)
+            step_cnt_up = int(step_cnt_down - self.public_step_res[-1]['step'])
 
             if fast_probe and pro_cnt > 2:
                 if i == 0 and up_min_z > self.best_above_z / 2:
@@ -738,12 +738,12 @@ class PRTouchEndstopWrapper:
                 elif i == pro_cnt - 1 or can_rt:
                     step_cnt_up += int(lost_min_cnt)
 
-            self.step_res, self.pres_res = [], []
-            self.start_step_prtouch_cmd.send([self.step_oid, 1, self.tri_send_ms, step_cnt_up, step_us_up, acc_ctl_cnt, self.low_spd_nul, self.send_step_duty, 0])
+            self.public_step_res, self.pres_res = [], []
+            self.public_start_step_prtouch_cmd.send([self.public_step_oid, 1, self.public_tri_send_ms, step_cnt_up, step_us_up, acc_ctl_cnt, self.low_spd_nul, self.send_step_duty, 0])
             t_last = time.time()
-            while (time.time() - t_last < (down_min_z / self.tri_z_down_spd + 5)) and (len(self.step_res) != MAX_BUF_LEN):
+            while (time.time() - t_last < (down_min_z / self.tri_z_down_spd + 5)) and (len(self.public_step_res) != MAX_BUF_LEN):
                 self._delay_s(0.010)
-            self.start_step_prtouch_cmd.send([self.step_oid, 1, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
+            self.public_start_step_prtouch_cmd.send([self.public_step_oid, 1, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
             self._ck_and_manual_get_step()
             if can_rt:
                 break
@@ -809,32 +809,32 @@ class PRTouchEndstopWrapper:
         self._set_hot_temps(temp=hot_min_temp + 40, wait=False, err=10)
 
         self._print_msg('CLEAR_NOZZLE', 'Start Src Pos Probe...')
-        self.move([src_pos[0], src_pos[1], src_pos[2]], self.rdy_xy_spd)
-        src_pos[2] = self.run_step_prtouch(self.g29_down_min_z, 0.1, False, 5, 3, True, self.tri_min_hold, self.tri_max_hold)
+        self.public_move([src_pos[0], src_pos[1], src_pos[2]], self.rdy_xy_spd)
+        src_pos[2] = self.public_run_step_prtouch(self.g29_down_min_z, 0.1, False, 5, 3, True, self.tri_min_hold, self.tri_max_hold)
         if self.use_adc:
             self._set_fan_speed('heater_fan', self.fan_heat_max_spd)
 
         self._print_msg('CLEAR_NOZZLE', 'Start End Pos Probe...')
-        self.move([end_pos[0], end_pos[1], end_pos[2]], self.rdy_xy_spd)
+        self.public_move([end_pos[0], end_pos[1], end_pos[2]], self.rdy_xy_spd)
         if self.use_adc:
             self._set_fan_speed('heater_fan', self.fan_heat_min_spd)
         self._set_fan_speed('fan', 0.0)
-        end_pos[2] = self.run_step_prtouch(self.g29_down_min_z, 0.1, False, 5, 3, True, self.tri_min_hold, self.tri_max_hold)
+        end_pos[2] = self.public_run_step_prtouch(self.g29_down_min_z, 0.1, False, 5, 3, True, self.tri_min_hold, self.tri_max_hold)
 
         self._print_msg('CLEAR_NOZZLE', 'Down And Wait Temp For %.2f...' % hot_max_temp)
-        self.move([src_pos[0], src_pos[1], self.bed_max_err], self.rdy_xy_spd)
-        self.move([src_pos[0], src_pos[1], src_pos[2] - self.pa_clr_down_mm], self.rdy_z_spd)
+        self.public_move([src_pos[0], src_pos[1], self.bed_max_err], self.rdy_xy_spd)
+        self.public_move([src_pos[0], src_pos[1], src_pos[2] - self.pa_clr_down_mm], self.rdy_z_spd)
         self._set_hot_temps(temp=hot_max_temp, wait=True, err=10)
 
         self._print_msg('CLEAR_NOZZLE', 'Start Clear The Noz...')
-        self.move(end_pos[:2] + [end_pos[2] + self.pa_clr_down_mm], self.clr_xy_spd)
+        self.public_move(end_pos[:2] + [end_pos[2] + self.pa_clr_down_mm], self.clr_xy_spd)
         self._set_fan_speed('fan', 1.0)
 
         self._print_msg('CLEAR_NOZZLE', 'Start Cool Down The Noz...')
         self._set_hot_temps(temp=hot_min_temp, wait=True, err=5)
 
         self._print_msg('CLEAR_NOZZLE', 'Start Finish Clear...')
-        self.move([end_pos[0] + self.pa_clr_dis_mm, end_pos[1], end_pos[2] + self.bed_max_err], self.clr_xy_spd)
+        self.public_move([end_pos[0] + self.pa_clr_dis_mm, end_pos[1], end_pos[2] + self.bed_max_err], self.clr_xy_spd)
         self._set_fan_speed('fan', 0.)
         self._set_bed_temps(temp=bed_max_temp, wait=True, err=5)
         self._set_step_par(load_sys=True)
@@ -843,8 +843,8 @@ class PRTouchEndstopWrapper:
 
     def _run_G28_Z(self, accurate=True):
         self._print_msg('RUN_G28_Z', 'Start run_G28_Z()...')
-        self.enable_steps()
-        self.get_mm_per_step()
+        self.public_enable_steps()
+        self.public_get_mm_per_step()
         self.jump_probe_ready = False
         self.toolhead.wait_moves()
         if not self.bed_mesh.get_mesh() and self.bed_mesh.pmgr.profiles.get('default', None):
@@ -872,38 +872,38 @@ class PRTouchEndstopWrapper:
         if self.use_adc:
             self._set_fan_speed('heater_fan', self.fan_heat_min_spd)
         self._set_fan_speed('fan', 0.0)
-        self.move(now_pos0, self.rdy_xy_spd / 5)
+        self.public_move(now_pos0, self.rdy_xy_spd / 5)
         self._env_self_check()
         out_mms = []
         old_tri_z_spd = self.tri_z_down_spd
         old_best_above_z = self.best_above_z
         for i in range(20):
-            self.enable_steps()
+            self.public_enable_steps()
             self._print_msg('RUN_G28_Z', 'Start Coarse Probe, Test Index=%d...' % i)
-            self.step_res, self.pres_res = [], []
-            params = self.deal_avgs_prtouch_cmd.send([self.pres_oid, 8])
+            self.public_step_res, self.pres_res = [], []
+            params = self.deal_avgs_prtouch_cmd.send([self.public_pres_oid, 8])
             self._print_msg('AVGS_RESAULT', str(params))
-            step_cnt_down, step_us_down, acc_ctl_cnt = self.get_step_cnts(self.max_z * 1.2, self.tri_z_down_spd * (1.2 if self.use_adc else 2.0))
-            self.start_pres_prtouch_cmd.send([self.pres_oid, 0, self.tri_acq_ms, self.tri_send_ms, self.tri_need_cnt,
+            step_cnt_down, step_us_down, acc_ctl_cnt = self.public_get_step_cnts(self.max_z * 1.2, self.tri_z_down_spd * (1.2 if self.use_adc else 2.0))
+            self.start_pres_prtouch_cmd.send([self.public_pres_oid, 0, self.tri_acq_ms, self.public_tri_send_ms, self.tri_need_cnt,
                                               int(self.tri_hftr_cut*1000),  int(self.tri_lftr_k1 * 1000) if self.use_adc else int(self.tri_lftr_k1 * 1000 * 0.85),
                                               self.tri_min_hold if self.use_adc else int(self.tri_min_hold * 2), self.tri_max_hold if self.use_adc else int(self.tri_max_hold * 2)])
-            self.start_step_prtouch_cmd.send([self.step_oid, 0, self.tri_send_ms, step_cnt_down, step_us_down, acc_ctl_cnt, self.low_spd_nul, self.send_step_duty, 0])
+            self.public_start_step_prtouch_cmd.send([self.public_step_oid, 0, self.public_tri_send_ms, step_cnt_down, step_us_down, acc_ctl_cnt, self.low_spd_nul, self.send_step_duty, 0])
             t_last = time.time()
-            while (time.time() - t_last < (self.max_z * 2.0) / (self.tri_z_down_spd * 1.2)) and (len(self.step_res) != MAX_BUF_LEN or len(self.pres_res) != MAX_BUF_LEN):
+            while (time.time() - t_last < (self.max_z * 2.0) / (self.tri_z_down_spd * 1.2)) and (len(self.public_step_res) != MAX_BUF_LEN or len(self.pres_res) != MAX_BUF_LEN):
                 self._delay_s(0.010)
-            self.start_step_prtouch_cmd.send([self.step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
-            self.start_pres_prtouch_cmd.send([self.pres_oid, 0, 0, 0, 0, 0, 0, 0, 0])
+            self.public_start_step_prtouch_cmd.send([self.public_step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
+            self.start_pres_prtouch_cmd.send([self.public_pres_oid, 0, 0, 0, 0, 0, 0, 0, 0])
             self._ck_and_manual_get_step()
 
             if len(self.pres_res) == 0:
                 self.gcode.run_script_from_command('FORCE_MOVE STEPPER=stepper_z DISTANCE=-1 VELOCITY=5')
                 self.gcode.run_script_from_command('FORCE_MOVE STEPPER=stepper_z DISTANCE=1 VELOCITY=5')
 
-            out_mm = (self.toolhead.get_position()[2] - (step_cnt_down - self.step_res[-1]['step']) * self.mm_per_step) \
-                    if len(self.pres_res) != MAX_BUF_LEN else self._cal_tri_data(step_cnt_down, self.toolhead.get_position()[2], self.step_res, self.pres_res)
+            out_mm = (self.toolhead.get_position()[2] - (step_cnt_down - self.public_step_res[-1]['step']) * self.mm_per_step) \
+                    if len(self.pres_res) != MAX_BUF_LEN else self._cal_tri_data(step_cnt_down, self.toolhead.get_position()[2], self.public_step_res, self.pres_res)
 
             self.toolhead.set_position(now_pos0[:2] + [0, now_pos0[3]], homing_axes=[2])
-            self.move(now_pos0[:2] + [self.best_above_z * 2, now_pos0[3]], self.tri_z_up_spd * (1.2 if self.use_adc else 2.0))
+            self.public_move(now_pos0[:2] + [self.best_above_z * 2, now_pos0[3]], self.tri_z_up_spd * (1.2 if self.use_adc else 2.0))
             out_mms.append(math.fabs(out_mm))
             if len(out_mms) > 3:
                 del out_mms[0]
@@ -926,14 +926,14 @@ class PRTouchEndstopWrapper:
 
         for i in range(3):
             self._print_msg('RUN_G28_Z', 'Start Precision Probe...')
-            self.move(self.toolhead.get_position()[:2] + [now_pos1[2]], self.rdy_z_spd)
-            self.move(now_pos1, self.rdy_xy_spd / 5)
+            self.public_move(self.toolhead.get_position()[:2] + [now_pos1[2]], self.rdy_z_spd)
+            self.public_move(now_pos1, self.rdy_xy_spd / 5)
             self._shake_motor(self.shake_cnt)
-            res_z = self.run_step_prtouch(self.max_z * 1.2, self.probe_min_3err, False, 5, 5, True)
+            res_z = self.public_run_step_prtouch(self.max_z * 1.2, self.probe_min_3err, False, 5, 5, True)
             self.toolhead.set_position(now_pos1[:2] + [self.toolhead.get_position()[2] - res_z, now_pos[3]], homing_axes=[2])
             self._print_msg('RUN_G28_Z', 'Start Result Check Probe...')
-            self.move(now_pos1[:2] + [self.bed_max_err, now_pos[3]], self.rdy_z_spd)
-            ck_z = self.run_step_prtouch(self.max_z * 1.2, self.probe_min_3err, False, 3, 3, True)
+            self.public_move(now_pos1[:2] + [self.bed_max_err, now_pos[3]], self.rdy_z_spd)
+            ck_z = self.public_run_step_prtouch(self.max_z * 1.2, self.probe_min_3err, False, 3, 3, True)
             if math.fabs(ck_z) > 1.0:
                 self.tri_z_down_spd *= 0.9
                 self._ck_and_raise_error(i == 2, ERR_G28_Z_DETECTION_ERROR)
@@ -955,7 +955,7 @@ class PRTouchEndstopWrapper:
         self._print_msg('VERSION', 'ARM(PRTH)=%s, MCU(PRES)=%s, MCU(STEP)=%s' % (self.ver_prth, self.ver_pres, self.ver_step))
         self.pres_res = []
         read_cnt = gcmd.get_int('C', 1)
-        self.read_pres_prtouch_cmd.send([self.pres_oid, self.tri_acq_ms, read_cnt])
+        self.read_pres_prtouch_cmd.send([self.public_pres_oid, self.tri_acq_ms, read_cnt])
         start_tick_s = time.time()
         while ((time.time() - start_tick_s) < (1.5 * (self.tri_acq_ms / 1000.) * read_cnt)) and len(self.pres_res) < read_cnt:
             self._delay_s(0.010)
@@ -974,11 +974,11 @@ class PRTouchEndstopWrapper:
     def cmd_TEST_SWAP(self, gcmd):
         del gcmd
 
-        self.write_swap_prtouch_cmd.send([self.pres_oid, 0])
-        params0 = self.read_swap_prtouch_cmd.send([self.step_oid])
+        self.public_write_swap_prtouch_cmd.send([self.public_pres_oid, 0])
+        params0 = self.public_read_swap_prtouch_cmd.send([self.public_step_oid])
 
-        self.write_swap_prtouch_cmd.send([self.pres_oid, 1])
-        params1 = self.read_swap_prtouch_cmd.send([self.step_oid])
+        self.public_write_swap_prtouch_cmd.send([self.public_pres_oid, 1])
+        params1 = self.public_read_swap_prtouch_cmd.send([self.public_step_oid])
         if not params0 or not params1 or params0['sta'] != 0 or params1['sta'] != 1:
             self._print_msg('SWAP_TEST', '!!!Swap Test ERROR!!!', True)
         else:
@@ -987,7 +987,7 @@ class PRTouchEndstopWrapper:
     cmd_DEAL_AVGS_help = "Read And Cal The Avgs."
     def cmd_DEAL_AVGS(self, gcmd):
         read_cnt = gcmd.get_int('C', 8)
-        params = self.deal_avgs_prtouch_cmd.send([self.pres_oid, read_cnt])
+        params = self.deal_avgs_prtouch_cmd.send([self.public_pres_oid, read_cnt])
         self._print_msg('AVGS_RESAULT', str(params), True)
 
     cmd_NOZZLE_CLEAR_help = "Clear the nozzle on bed."
@@ -1003,19 +1003,19 @@ class PRTouchEndstopWrapper:
 
     cmd_START_STEP_PRTOUCH_help = "Start the step prtouch."
     def cmd_START_STEP_PRTOUCH(self, gcmd):
-        self.enable_steps()
-        self.get_mm_per_step()
+        self.public_enable_steps()
+        self.public_get_mm_per_step()
         run_dir = gcmd.get_int('DIR', 0)
         run_spd = gcmd.get_float('SPD', 10)
         run_dis = gcmd.get_float('DIS', 10)
-        self.step_res = []
-        step_cnt, step_us, acc_ctl_cnt = self.get_step_cnts(run_dis, run_spd)
-        self.start_step_prtouch_cmd.send([self.step_oid, run_dir, self.tri_send_ms, step_cnt, step_us, acc_ctl_cnt, self.low_spd_nul, self.send_step_duty, 0])
+        self.public_step_res = []
+        step_cnt, step_us, acc_ctl_cnt = self.public_get_step_cnts(run_dis, run_spd)
+        self.public_start_step_prtouch_cmd.send([self.public_step_oid, run_dir, self.public_tri_send_ms, step_cnt, step_us, acc_ctl_cnt, self.low_spd_nul, self.send_step_duty, 0])
         t_last = time.time()
-        while (time.time() - t_last < (run_dis / run_spd + 5)) and (len(self.step_res) != MAX_BUF_LEN):
+        while (time.time() - t_last < (run_dis / run_spd + 5)) and (len(self.public_step_res) != MAX_BUF_LEN):
             self._delay_s(0.010)
-        self.start_step_prtouch_cmd.send([self.step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
-        self._ck_and_raise_error(len(self.step_res) != MAX_BUF_LEN, ERR_STEP_LOST_RUN_DATA, [len(self.step_res)])
+        self.public_start_step_prtouch_cmd.send([self.public_step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
+        self._ck_and_raise_error(len(self.public_step_res) != MAX_BUF_LEN, ERR_STEP_LOST_RUN_DATA, [len(self.public_step_res)])
 
     cmd_PRTOUCH_READY_help = "Test the ready point."
     def cmd_PRTOUCH_READY(self, gcmd):
@@ -1039,70 +1039,70 @@ class PRTouchEndstopWrapper:
 
     cmd_SAFE_DOWN_Z_help = "Safe down z before G28"
     def cmd_SAFE_DOWN_Z(self, gcmd):
-        self.get_mm_per_step()
-        self.enable_steps()
+        self.public_get_mm_per_step()
+        self.public_enable_steps()
         down_dis = gcmd.get_float('DOWN_DIS', 5)
         up_dis = gcmd.get_float('UP_DIS', 0)
 
         if down_dis != 0:
             if self.safe_z_dead_dis != 0 and down_dis > self.safe_z_dead_dis + 1:
-                self.step_res, self.pres_res = [], []
-                step_cnt_down, step_us_down, acc_ctl_cnt = self.get_step_cnts(self.safe_z_dead_dis, self.tri_z_down_spd)
-                self.start_step_prtouch_cmd.send([self.step_oid, 1, self.tri_send_ms, step_cnt_down, step_us_down, acc_ctl_cnt, self.low_spd_nul, self.send_step_duty, 0])
+                self.public_step_res, self.pres_res = [], []
+                step_cnt_down, step_us_down, acc_ctl_cnt = self.public_get_step_cnts(self.safe_z_dead_dis, self.tri_z_down_spd)
+                self.public_start_step_prtouch_cmd.send([self.public_step_oid, 1, self.public_tri_send_ms, step_cnt_down, step_us_down, acc_ctl_cnt, self.low_spd_nul, self.send_step_duty, 0])
                 t_last = time.time()
-                while ((time.time() - t_last) < ((self.safe_z_dead_dis / 1.0) + 10)) and (len(self.step_res) != MAX_BUF_LEN):
+                while ((time.time() - t_last) < ((self.safe_z_dead_dis / 1.0) + 10)) and (len(self.public_step_res) != MAX_BUF_LEN):
                     self._delay_s(0.010)
-                self.start_step_prtouch_cmd.send([self.step_oid, 1, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
+                self.public_start_step_prtouch_cmd.send([self.public_step_oid, 1, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
                 self._ck_and_manual_get_step()
                 down_dis -= self.safe_z_dead_dis
-            self.step_res, self.pres_res = [], []
-            params = self.deal_avgs_prtouch_cmd.send([self.pres_oid, 8])
+            self.public_step_res, self.pres_res = [], []
+            params = self.deal_avgs_prtouch_cmd.send([self.public_pres_oid, 8])
             self._print_msg('AVGS_RESAULT', str(params))
-            step_cnt_down, step_us_down, acc_ctl_cnt = self.get_step_cnts(down_dis, self.tri_z_down_spd)
-            self.start_pres_prtouch_cmd.send([self.pres_oid, 1, self.tri_acq_ms, self.tri_send_ms, self.tri_need_cnt,
+            step_cnt_down, step_us_down, acc_ctl_cnt = self.public_get_step_cnts(down_dis, self.tri_z_down_spd)
+            self.start_pres_prtouch_cmd.send([self.public_pres_oid, 1, self.tri_acq_ms, self.public_tri_send_ms, self.tri_need_cnt,
                                               int(self.tri_hftr_cut * 1000), int(self.tri_lftr_k1 * 1000),
                                               self.tri_min_hold if self.use_adc else (self.tri_min_hold * 2), self.tri_max_hold if self.use_adc else (self.tri_max_hold * 2)])
-            self.start_step_prtouch_cmd.send([self.step_oid, 1, self.tri_send_ms, step_cnt_down, step_us_down, acc_ctl_cnt, self.low_spd_nul, self.send_step_duty, 0])
+            self.public_start_step_prtouch_cmd.send([self.public_step_oid, 1, self.public_tri_send_ms, step_cnt_down, step_us_down, acc_ctl_cnt, self.low_spd_nul, self.send_step_duty, 0])
             t_last = time.time()
-            while ((time.time() - t_last) < ((down_dis / self.tri_z_down_spd) + 10)) and (len(self.step_res) != MAX_BUF_LEN):
+            while ((time.time() - t_last) < ((down_dis / self.tri_z_down_spd) + 10)) and (len(self.public_step_res) != MAX_BUF_LEN):
                 self._delay_s(0.010)
-            self.start_step_prtouch_cmd.send([self.step_oid, 1, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
-            self.start_pres_prtouch_cmd.send([self.pres_oid, 1, 0, 0, 0, 0, 0, 0, 0])
+            self.public_start_step_prtouch_cmd.send([self.public_step_oid, 1, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
+            self.start_pres_prtouch_cmd.send([self.public_pres_oid, 1, 0, 0, 0, 0, 0, 0, 0])
             self._print_res()
             self._ck_and_manual_get_step()
 
         if up_dis != 0:
             if self.safe_z_dead_dis != 0 and up_dis > self.safe_z_dead_dis + 1:
-                self.step_res, self.pres_res = [], []
-                step_cnt_up, step_us_up, acc_ctl_cnt = self.get_step_cnts(self.safe_z_dead_dis, self.tri_z_down_spd)
-                self.start_step_prtouch_cmd.send([self.step_oid, 0, self.tri_send_ms, step_cnt_up, step_us_up, 0, self.low_spd_nul, self.send_step_duty, 0])
+                self.public_step_res, self.pres_res = [], []
+                step_cnt_up, step_us_up, acc_ctl_cnt = self.public_get_step_cnts(self.safe_z_dead_dis, self.tri_z_down_spd)
+                self.public_start_step_prtouch_cmd.send([self.public_step_oid, 0, self.public_tri_send_ms, step_cnt_up, step_us_up, 0, self.low_spd_nul, self.send_step_duty, 0])
                 t_last = time.time()
-                while ((time.time() - t_last) < ((self.safe_z_dead_dis / 1.0) + 10)) and (len(self.step_res) != MAX_BUF_LEN):
+                while ((time.time() - t_last) < ((self.safe_z_dead_dis / 1.0) + 10)) and (len(self.public_step_res) != MAX_BUF_LEN):
                     self._delay_s(0.010)
-                self.start_step_prtouch_cmd.send([self.step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
+                self.public_start_step_prtouch_cmd.send([self.public_step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
                 self._ck_and_manual_get_step()
                 up_dis -= self.safe_z_dead_dis
-            self.step_res, self.pres_res = [], []
-            params = self.deal_avgs_prtouch_cmd.send([self.pres_oid, 8])
+            self.public_step_res, self.pres_res = [], []
+            params = self.deal_avgs_prtouch_cmd.send([self.public_pres_oid, 8])
             self._print_msg('AVGS_RESAULT', str(params))
-            step_cnt_up, step_us_up, acc_ctl_cnt = self.get_step_cnts(up_dis, self.tri_z_down_spd)
-            self.start_pres_prtouch_cmd.send([self.pres_oid, 0, self.tri_acq_ms, self.tri_send_ms, self.tri_need_cnt,
+            step_cnt_up, step_us_up, acc_ctl_cnt = self.public_get_step_cnts(up_dis, self.tri_z_down_spd)
+            self.start_pres_prtouch_cmd.send([self.public_pres_oid, 0, self.tri_acq_ms, self.public_tri_send_ms, self.tri_need_cnt,
                                               int(self.tri_hftr_cut * 1000), int(self.tri_lftr_k1 * 1000),
                                               self.tri_min_hold if self.use_adc else (self.tri_min_hold * 2), self.tri_max_hold if self.use_adc else (self.tri_max_hold * 2)])
-            self.start_step_prtouch_cmd.send([self.step_oid, 0, self.tri_send_ms, step_cnt_up, step_us_up, acc_ctl_cnt, self.low_spd_nul, self.send_step_duty, 0])
+            self.public_start_step_prtouch_cmd.send([self.public_step_oid, 0, self.public_tri_send_ms, step_cnt_up, step_us_up, acc_ctl_cnt, self.low_spd_nul, self.send_step_duty, 0])
             t_last = time.time()
-            while ((time.time() - t_last) < ((up_dis / self.tri_z_down_spd) + 10)) and (len(self.step_res) != MAX_BUF_LEN):
+            while ((time.time() - t_last) < ((up_dis / self.tri_z_down_spd) + 10)) and (len(self.public_step_res) != MAX_BUF_LEN):
                 self._delay_s(0.010)
-            self.start_step_prtouch_cmd.send([self.step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
-            self.start_pres_prtouch_cmd.send([self.pres_oid, 0, 0, 0, 0, 0, 0, 0, 0])
+            self.public_start_step_prtouch_cmd.send([self.public_step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
+            self.start_pres_prtouch_cmd.send([self.public_pres_oid, 0, 0, 0, 0, 0, 0, 0, 0])
             self._ck_and_manual_get_step()
 
     cmd_TRIG_TEST_help = "Test The Tri is Normal"
     def cmd_TRIG_TEST(self, gcmd):
-        self.enable_steps()
-        self.get_mm_per_step()
+        self.public_enable_steps()
+        self.public_get_mm_per_step()
         run_cnt = gcmd.get_int('C', 1)
-        self.run_step_prtouch(20, 0, False, run_cnt, run_cnt, True) # (self.max_z*1.2, 0, False, run_cnt, run_cnt, True)
+        self.public_run_step_prtouch(20, 0, False, run_cnt, run_cnt, True) # (self.max_z*1.2, 0, False, run_cnt, run_cnt, True)
 
     cmd_SELF_CHECK_PRTOUCH_help = "Self check the pres."
     def cmd_SELF_CHECK_PRTOUCH(self, gcmd):
