@@ -14,7 +14,6 @@ PR_VERSION = 307
 
 # COMMANDS
 
-# DEAL_AVGS
 # TRIG_TEST C=10
 # SELF_CHECK_PRTOUCH
 # START_STEP_PRTOUCH DIR=1 SPD=10 DIS=10
@@ -153,7 +152,6 @@ class PRTouchEndstopWrapper:
         self.step_mcu.register_config_callback(self._build_step_config)
         self.pres_mcu.register_config_callback(self._build_pres_config)
 
-        self.gcode.register_command('DEAL_AVGS', self.cmd_DEAL_AVGS, desc=self.cmd_DEAL_AVGS_help)
         self.gcode.register_command('TRIG_TEST', self.cmd_TRIG_TEST, desc=self.cmd_TRIG_TEST_help)
         self.gcode.register_command('CHECK_BED_MESH', self.cmd_CHECK_BED_MESH, desc=self.cmd_CHECK_BED_MESH_help)
         self.gcode.register_command('PRTOUCH_READY', self.cmd_PRTOUCH_READY, desc=self.cmd_PRTOUCH_READY_help)
@@ -934,12 +932,6 @@ class PRTouchEndstopWrapper:
             self._set_fan_speed('heater_fan', self.fan_heat_max_spd)
         self._set_step_par(load_sys=True)
         self.bed_mesh.set_mesh(mesh)
-
-    cmd_DEAL_AVGS_help = "Read And Cal The Avgs."
-    def cmd_DEAL_AVGS(self, gcmd):
-        read_cnt = gcmd.get_int('C', 8)
-        params = self.deal_avgs_prtouch_cmd.send([self.public_pres_oid, read_cnt])
-        self._print_msg('AVGS_RESAULT', str(params), True)
 
     cmd_NOZZLE_CLEAR_help = "Clear the nozzle on bed."
     def cmd_NOZZLE_CLEAR(self, gcmd):
