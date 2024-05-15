@@ -165,18 +165,18 @@ class ZCompensateInit:
         self._move([end_pos[0], end_pos[1], end_pos[2]], self.rdy_xy_spd)
         end_pos[2] = self.prtouch.public_run_step_prtouch(self.g29_down_min_z, 0, False, self.pr_clear_probe_cnt, self.pr_clear_probe_cnt, True, self.tri_min_hold, self.tri_max_hold)
         self._move([src_pos[0], src_pos[1], self.bed_max_err], self.rdy_xy_spd)
-        self._move([src_pos[0], src_pos[1] + 5, src_pos[2] - self.pa_clr_down_mm], self.rdy_z_spd)#移到擦喷嘴起始点
-        self._set_hot_temps(temp=hot_rub_temp, wait=True, err=10) #等待加热
+        self._move([src_pos[0], src_pos[1] + 5, src_pos[2] - self.pa_clr_down_mm], self.rdy_z_spd)# Move to the nozzle wipe starting point
+        self._set_hot_temps(temp=hot_rub_temp, wait=True, err=10) # Wait for heating
         self.gcode.run_script_from_command('G91')
-        self.gcode.run_script_from_command('G0 E-%f' %(self.pumpback_mm)) #回抽
+        self.gcode.run_script_from_command('G0 E-%f' %(self.pumpback_mm)) # Retract
         self.gcode.run_script_from_command('G90')
         cur_pos = self.toolhead.get_position()
         end_pos[3] = cur_pos[3]
-        self._move([end_pos[0], end_pos[1] - 5, end_pos[2] + self.pa_clr_down_mm], self.clr_xy_spd)# 擦喷嘴
+        self._move([end_pos[0], end_pos[1] - 5, end_pos[2] + self.pa_clr_down_mm], self.clr_xy_spd) # Wipe the nozzle
         self.gcode.run_script_from_command('M106 S255')
         self._set_hot_temps(temp=hot_end_temp, wait=True, err=5)
-        self._set_bed_temps(temp=bed_add_temp, wait=True, err=5) #等待降温
-        self._move([end_pos[0] + self.pa_clr_dis_mm, end_pos[1], end_pos[2] + self.bed_max_err], 100) #上抬
+        self._set_bed_temps(temp=bed_add_temp, wait=True, err=5) # Wait for cooling
+        self._move([end_pos[0] + self.pa_clr_dis_mm, end_pos[1], end_pos[2] + self.bed_max_err], 100) # Lift up
         self.gcode.run_script_from_command('M107')
         self._set_bed_temps(temp=bed_add_temp, wait=True, err=5)
         self._set_step_par(load_sys=True)
@@ -203,7 +203,7 @@ class ZCompensateInit:
     def cmd_Z_OFFSET_CALIBRATION(self, gcmd):   # PRTOUCH_TEST X=20 Y=20 Z=-4 S=0.0125
         self.bed_mesh       = self.printer.lookup_object('bed_mesh')
         self.toolhead       = self.printer.lookup_object("toolhead")
-        #清除调平数据
+        # Clear leveling data
         mesh = self.bed_mesh.get_mesh()
         self.bed_mesh.set_mesh(None)
         self.gcode.run_script_from_command('SET_GCODE_OFFSEt Z_ADJUST=%f MOVE=1' %(0 - self.z_offset_move))
@@ -215,7 +215,7 @@ class ZCompensateInit:
                    [self.noz_pos_center[0] + pr_pos_x , self.noz_pos_center[1] - pr_pos_y],
                    [self.noz_pos_center[0] - pr_pos_x , self.noz_pos_center[1] + pr_pos_y],
                  ]
-        # 喷嘴探下
+        # Nozzle probe down
 
         pr_data = [0,0,0,0]
         z_offset = [0,0,0,0]
@@ -237,11 +237,11 @@ class ZCompensateInit:
         self.z_offset_move = z_offset_old - z_offset_new
         self.gcode.run_script_from_command('SET_GCODE_OFFSEt Z_ADJUST=%f MOVE=1' % (self.z_offset_move))
 
-        # #把Z轴补偿写到cfg文件中
+        # Write Z-axis compensation to cfg file
         configfile = self.printer.lookup_object('configfile')
         new_calibrate = z_offset_new
 
-        #如果有错误
+        # If there is an error
         if new_calibrate < 0:
             self.gcode.run_script_from_command('SET_GCODE_OFFSEt Z_ADJUST=%f MOVE=1' % (-self.z_offset_move))
             self.z_offset_move = 0
@@ -254,7 +254,7 @@ class ZCompensateInit:
                 % (self.printer.lookup_object('probe').name, new_calibrate))
 
         configfile.set(self.printer.lookup_object('probe').name, 'z_offset', "%.3f" % (new_calibrate,))
-        #写入调平数据
+        # Write leveling data
         self.bed_mesh.set_mesh(mesh)
 
     cmd_Z_OFFSET_AUTO_help = "Z offset auto"
