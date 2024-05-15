@@ -23,11 +23,10 @@ class GCodeMove:
         self.is_printer_ready = False
         # Register g-code commands
         gcode = printer.lookup_object('gcode')
-        self.gcode = gcode
         handlers = [
             'G1', 'G20', 'G21',
             'M82', 'M83', 'G90', 'G91', 'G92', 'M220', 'M221',
-            'SET_GCODE_OFFSET', 'SAVE_GCODE_STATE', 'RESTORE_GCODE_STATE'
+            'SET_GCODE_OFFSET', 'SAVE_GCODE_STATE', 'RESTORE_GCODE_STATE',
         ]
         for cmd in handlers:
             func = getattr(self, 'cmd_' + cmd)
@@ -50,10 +49,6 @@ class GCodeMove:
         self.saved_states = {}
         self.move_transform = self.move_with_transform = None
         self.position_with_transform = (lambda: [0., 0., 0., 0.])
-        try:
-            self.printer_config = config.getsection('printer')
-        except Exception as err:
-            logging.error(err)
     def _handle_ready(self):
         self.is_printer_ready = True
         if self.move_transform is None:
@@ -142,9 +137,6 @@ class GCodeMove:
                     raise gcmd.error("Invalid speed in '%s'"
                                      % (gcmd.get_commandline(),))
                 self.speed = gcode_speed * self.speed_factor
-            if 'S' in params:
-                gcode_speed = float(params['S'])
-                self.gcode.run_script_from_command('M3 S%s' % gcode_speed)
         except ValueError as e:
             raise gcmd.error("Unable to parse move '%s'"
                              % (gcmd.get_commandline(),))
@@ -214,6 +206,7 @@ class GCodeMove:
             for pos, delta in enumerate(move_delta):
                 self.last_position[pos] += delta
             self.move_with_transform(self.last_position, speed)
+    cmd_SAVE_GCODE_STATE_help = "Save G-Code coordinate state"
     def cmd_SAVE_GCODE_STATE(self, gcmd):
         state_name = gcmd.get('NAME', 'default')
         self.saved_states[state_name] = {
