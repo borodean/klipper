@@ -59,9 +59,6 @@ class PRTouchEndstopWrapper:
         self.acc_ctl_mm         = config.getfloat('acc_ctl_mm', (0.5 if self.use_adc else 0.25), minval=0, maxval=10)
         self.low_spd_nul        = config.getint('low_spd_nul', 5, minval=1, maxval=10)
         self.send_step_duty     = config.getint('send_step_duty', 16, minval=0, maxval=10)
-        # 6. Gap Cfg
-        self.stored_profs       = config.get_prefix_sections('prtouch')
-        self.stored_profs       = self.stored_profs[1] if len(self.stored_profs) == 2 else None
         # 6. Other Cfg
         self.g29_down_min_z     = config.getfloat('g29_down_min_z', default=25, minval=5, maxval=500)
         self.probe_min_3err     = config.getfloat('probe_min_3err', default=0.1, minval=0.01, maxval=1)
