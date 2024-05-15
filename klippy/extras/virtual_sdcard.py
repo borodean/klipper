@@ -55,7 +55,6 @@ class VirtualSD:
         self.count = 0
         self.count_G1 = 0
         self.count_line = 0
-        self.do_cancel_status = False
         self.power_loss_pause_flag = False
         self.pause_flag = 1  # 1 Pause during printing, 2 Suspension of preheating process after power failure
         self.fan_state = ""
@@ -142,7 +141,6 @@ class VirtualSD:
         self.work_timer = self.reactor.register_timer(
             self.work_handler, self.reactor.NOW)
     def do_cancel(self):
-        self.do_cancel_status = True
         if self.current_file is not None:
             self.do_pause()
             self.current_file.close()
@@ -456,7 +454,6 @@ class VirtualSD:
         self.count_G1 = 0
         self.count_line = 0
         state = {}
-        self.do_cancel_status = False
         self.work_timer = None
         self.cmd_from_sd = False
         if error_message is not None:
