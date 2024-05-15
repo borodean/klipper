@@ -66,9 +66,6 @@ class PauseResume:
         import os, time
         reactor = self.printer.get_reactor()
         count = 0
-        while self.v_sd.toolhead_moved:
-            time.sleep(0.001)
-            reactor.pause(reactor.monotonic() + .01)
         if self.is_paused:
             gcmd.respond_info("Print is not paused, resume aborted")
             return

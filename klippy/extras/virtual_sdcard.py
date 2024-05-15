@@ -52,7 +52,6 @@ class VirtualSD:
         self.gcode.register_command(
             "SDCARD_PRINT_FILE", self.cmd_SDCARD_PRINT_FILE,
             desc=self.cmd_SDCARD_PRINT_FILE_help)
-        self.toolhead_moved = False
     def handle_shutdown(self):
         if self.work_timer is not None:
             self.must_pause_work = True
@@ -335,7 +334,6 @@ class VirtualSD:
                             break
                     if calc_layer_count == 5:
                         os.system("touch /tmp/layer_count_%s.temp" % self.index)
-                self.toolhead_moved = False
                 self.gcode.run_script(line)
             except self.gcode.error as e:
                 error_message = str(e)
