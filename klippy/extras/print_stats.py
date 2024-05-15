@@ -29,25 +29,13 @@ class PrintStats:
     def set_current_file(self, filename):
         self.reset()
         self.filename = filename
-    def note_start(self, info_path=""):
-        import os, json
+    def note_start(self):
         curtime = self.reactor.monotonic()
         # Reset last e-position
         gc_status = self.gcode_move.get_status(curtime)
-        if info_path and os.path.exists(info_path):
-            ret = {}
-            try:
-                with open(info_path, "r") as f:
-                    ret = json.loads(f.read())
-                    self.filament_used = ret.get("filament_used", 0)
-            except Exception as err:
-                pass
         self.last_epos = gc_status['position'].e
         if self.print_start_time is None:
-            if info_path and ret and ret.get("last_print_duration"):
-                self.print_start_time = curtime - int(ret.get("last_print_duration"))
-            else:
-                self.print_start_time = curtime
+            self.print_start_time = curtime
         elif self.last_pause_time is not None:
             # Update pause time duration
             pause_duration = curtime - self.last_pause_time
