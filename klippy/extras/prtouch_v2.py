@@ -24,8 +24,6 @@ ERR_PRES_NOT_BE_SENSED      = 'The pressure data in channel=%s cannot be properl
 ERR_PRES_LOST_RUN_DATA      = 'The pressure data is lost when the probe is over and waiting for the data to be sent back'
 ERR_PRES_NOISE_TOO_BIG      = 'Sensor data noise is too big, channel=%s'
 ERR_STEP_LOST_RUN_DATA      = 'The motor step data is lost when the probe is over and waiting for data return'
-ERR_G28_Z_DETECTION_TIMEOUT = 'G28 Z try probe out of times'
-ERR_G28_Z_DETECTION_ERROR   = 'G28 Z probe ERROR'
 ERR_SWAP_PIN_DETECTI        = 'The synchronization pin test failed, pres_swap_pin=%s, step_swap_pin=%s'
 
 MAX_PRES_CNT = 4
@@ -38,15 +36,13 @@ class PRTouchEndstopWrapper:
         self.config = config
         self.printer = config.get_printer()
         self.shut_down = False
-        self.has_save_sys_acc = False
         self.mm_per_step, self.pres_tri_time, self.step_tri_time, self.pres_tri_chs, self.pres_buf_cnt = 0, 0, 0, 0, 0
         self.mm_per_step = None
-        self.sys_max_velocity, self.sys_max_accel, self.sys_max_z_velocity, self.sys_max_z_accel = 0, 0, 0, 0
 
         self.public_step_res, self.pres_res = [], []
         self.public_read_swap_prtouch_cmd, self.public_start_step_prtouch_cmd = None, None
         self.public_write_swap_prtouch_cmd, self.read_pres_prtouch_cmd, self.start_pres_prtouch_cmd = None, None, None
-        self.bed_mesh, self.toolhead, self.bed_mesh, self.pheaters, self.heater_hot = None, None, None, None, None
+        self.bed_mesh, self.toolhead, self.bed_mesh = None, None, None
         # 0. Base Cfg
         self.use_adc            = config.getboolean('use_adc', default=False)
         # 1. Tri Cfg
@@ -64,7 +60,6 @@ class PRTouchEndstopWrapper:
         self.shake_cnt          = config.getint('shake_cnt', default=8, minval=1, maxval=512)
         self.shake_range        = config.getint('shake_range', default=0.5, minval=0.1, maxval=2)
         # 4. Clear Nozzle Cfg
-        self.hot_min_temp       = config.getfloat('hot_min_temp', default=140, minval=80, maxval=200)
         self.pa_clr_dis_mm      = config.getfloat('pa_clr_dis_mm', default=30, minval=2, maxval=100)
         self.clr_noz_start_x    = config.getfloat('clr_noz_start_x', default=0, minval=0, maxval=1000)
         self.clr_noz_start_y    = config.getfloat('clr_noz_start_y', default=0, minval=0, maxval=1000)
@@ -73,30 +68,19 @@ class PRTouchEndstopWrapper:
         # 5. Speed Cfg
         self.tri_z_down_spd     = config.getfloat('speed', default=(10 if self.use_adc else 2.5), minval=0.1, maxval=(30 if self.use_adc else 5)) # speed
         self.tri_z_up_spd       = config.getfloat('lift_speed', self.tri_z_down_spd * (1.0 if self.use_adc else 2.0), minval=0.1, maxval=100)
-        self.rdy_xy_spd         = config.getfloat('rdy_xy_spd', default=(300 if self.use_adc else 200), minval=1, maxval=1000)
         self.rdy_z_spd          = config.getfloat('rdy_z_spd', default=self.tri_z_up_spd, minval=1, maxval=50)
         self.acc_ctl_mm         = config.getfloat('acc_ctl_mm', (0.5 if self.use_adc else 0.25), minval=0, maxval=10)
         self.low_spd_nul        = config.getint('low_spd_nul', 5, minval=1, maxval=10)
         self.send_step_duty     = config.getint('send_step_duty', 16, minval=0, maxval=10)
-        self.run_max_velocity   = config.getfloat('run_max_velocity', default=500, minval=1, maxval=5000)
-        self.run_max_accel      = config.getfloat('run_max_accel', default=500, minval=1, maxval=50000)
-        self.run_max_z_velocity = config.getfloat('run_max_z_velocity', default=20, minval=1, maxval=5000)
-        self.run_max_z_accel    = config.getfloat('run_max_z_accel', default=200, minval=1, maxval=50000)
         # 6. Gap Cfg
         self.stored_profs       = config.get_prefix_sections('prtouch')
         self.stored_profs       = self.stored_profs[1] if len(self.stored_profs) == 2 else None
         # 6. Other Cfg
         self.need_self_check    = config.getboolean('need_self_check', default=False)
-        self.bed_max_err        = config.getfloat('bed_max_err', (5 if self.use_adc else 3), minval=1, maxval=10)
-        self.max_z              = config.getsection('stepper_z').getfloat('position_max', default=300, minval=10, maxval=500)
         self.g29_down_min_z     = config.getfloat('g29_down_min_z', default=25, minval=5, maxval=500)
         self.probe_min_3err     = config.getfloat('probe_min_3err', default=0.1, minval=0.01, maxval=1)
         self.step_base          = config.getint('step_base', 1, minval=1, maxval=10)
-        self.g28_wait_cool_down = config.getboolean('g28_wait_cool_down', default=False)
         self.best_above_z       = config.getfloat('best_above_z', default=(3 if self.use_adc else 2), minval=2, maxval=10) # above
-        # 7. Fan Cfg
-        self.fan_heat_min_spd   = config.getfloat('fan_heat_min_spd', default=0.3, minval=0, maxval=255)
-        self.fan_heat_max_spd   = config.getfloat('fan_heat_max_spd', default=1.0, minval=0, maxval=255)
 
         self.gcode              = self.printer.lookup_object('gcode')
 
@@ -132,7 +116,6 @@ class PRTouchEndstopWrapper:
         self.step_mcu.register_config_callback(self._build_step_config)
         self.pres_mcu.register_config_callback(self._build_pres_config)
 
-        self.gcode.register_command('COARSE_HOME_Z', self.cmd_COARSE_HOME_Z, desc=self.cmd_COARSE_HOME_Z_help)
         self.gcode.register_command('SELF_CHECK_PRTOUCH', self.cmd_SELF_CHECK_PRTOUCH, desc=self.cmd_SELF_CHECK_PRTOUCH_help)
         self.gcode.register_command('START_STEP_PRTOUCH', self.cmd_START_STEP_PRTOUCH, desc=self.cmd_START_STEP_PRTOUCH_help)
 
@@ -143,8 +126,6 @@ class PRTouchEndstopWrapper:
     def _build_step_config(self):
         self.bed_mesh   = self.printer.lookup_object('bed_mesh')
         self.toolhead   = self.printer.lookup_object("toolhead")
-        self.pheaters   = self.printer.lookup_object('heaters')
-        self.heater_hot = self.printer.lookup_object('extruder').heater
 
         min_x, _ = self.bed_mesh.bmc.mesh_min
         max_x, max_y = self.bed_mesh.bmc.mesh_max
@@ -277,26 +258,6 @@ class PRTouchEndstopWrapper:
             self.toolhead.get_last_move_time()
             eventtime = reactor.pause(eventtime + delay_s)
 
-    def _set_step_par(self, load_sys=True):
-        if load_sys:
-            self.toolhead.max_velocity = self.sys_max_velocity
-            self.toolhead.max_accel = self.sys_max_accel
-            self.toolhead.kin.max_z_velocity = self.sys_max_z_velocity
-            self.toolhead.kin.max_z_accel = self.sys_max_z_accel
-            self.has_save_sys_acc = False
-            return
-        if not self.has_save_sys_acc:
-            self.sys_max_velocity = self.toolhead.max_velocity
-            self.sys_max_accel = self.toolhead.max_accel
-            self.sys_max_z_velocity = self.toolhead.kin.max_z_velocity
-            self.sys_max_z_accel = self.toolhead.kin.max_z_accel
-
-            self.toolhead.max_velocity = self.run_max_velocity
-            self.toolhead.max_accel = self.run_max_accel
-            self.toolhead.kin.max_z_velocity = self.run_max_z_velocity
-            self.toolhead.kin.max_z_accel = self.run_max_z_accel
-            self.has_save_sys_acc = True
-
     def public_enable_steps(self):
         self._print_msg('ENABLE_STEPS', 'Start enable_steps()...')
         for stepper in self.toolhead.get_kinematics().get_steppers():
@@ -329,27 +290,6 @@ class PRTouchEndstopWrapper:
             self.gcode.run_script_from_command(gcmd)
             if wait:
                 self.toolhead.wait_moves()
-
-    def _set_fan_speed(self, fan_name='None', fan_spd=0.):
-        self._print_msg('SET_FAN_SPEED', 'fan_name=%s, fan_spd=%f' % (fan_name, fan_spd))
-        if fan_name == 'heater_fan':
-            for key in self.printer.objects:
-                if 'heater_fan' in key:
-                    self.printer.objects[key].fan.set_speed_from_command(fan_spd)
-                    break
-
-        if fan_name == 'fan':
-            if 'fan' in self.printer.objects:
-                self.printer.lookup_object('fan').fan.set_speed_from_command(fan_spd)
-            else:
-                self.gcode.run_script_from_command('M106 P0 S%d' % (fan_spd * 255))
-
-    def _set_hot_temps(self, temp, wait=False, err=5):
-        self._print_msg('SET_HOT_TEMPS', 'temp=%.2f, wait=%d, err=%f'% (temp, wait, err))
-        self.pheaters.set_temperature(self.heater_hot, temp, False)
-        if wait:
-            while not self.shut_down and abs(self.heater_hot.target_temp - self.heater_hot.smoothed_temp) > err and self.heater_hot.target_temp > 0:
-                self._delay_s(0.100)
 
     def _shake_motor(self, cnt):
         self._print_msg('SHAKE_MOTOR', 'cnt=%d' % cnt)
@@ -639,114 +579,6 @@ class PRTouchEndstopWrapper:
         self._print_ary('RES_Z', res_z, len(res_z))
         return res_z[int((len(res_z) - 1) / 2)] if len(res_z) != 2 else (res_z[0] + res_z[1]) / 2
 
-    def _run_G28_Z(self, accurate=True):
-        self._print_msg('RUN_G28_Z', 'Start run_G28_Z()...')
-        self.public_enable_steps()
-        self.public_get_mm_per_step()
-        self.toolhead.wait_moves()
-        if not self.bed_mesh.get_mesh() and self.bed_mesh.pmgr.profiles.get('default', None):
-            self.gcode.run_script_from_command('BED_MESH_PROFILE LOAD=\"default\"')
-        mesh = self.bed_mesh.get_mesh()
-        self.bed_mesh.set_mesh(None)
-        self._set_step_par(load_sys=False)
-        now_pos = self.toolhead.get_position()
-        self.toolhead.set_position(now_pos[:2] + [0, now_pos[3]], homing_axes=[2])
-        min_x, min_y = self.bed_mesh.bmc.mesh_min
-        max_x, max_y = self.bed_mesh.bmc.mesh_max
-        now_pos = [min_x + (max_x - min_x) / 2, min_y + (max_y - min_y) / 2, now_pos[2], now_pos[3]]
-        # 1. Check hot temp
-        target_temp = self.heater_hot.target_temp
-        if self.g28_wait_cool_down and self.heater_hot.smoothed_temp > (self.hot_min_temp + 5):
-            self._print_msg('DEBUG', 'G28_Z: Wait for Nozzle to cool down[%.2f -> %.2f]...' % (target_temp, self.hot_min_temp))
-            self._set_fan_speed('fan', 1.0)
-            self._set_hot_temps(temp=self.hot_min_temp, wait=True, err=5)
-            self._set_fan_speed('fan', 0.0)
-        # 2. First probe z
-        random.seed(int(time.time()))
-        now_pos0 = [now_pos[0] + (1 if (int(time.time() * 1000) % 2 == 0) else -1) * random.uniform(4, 8),
-                    now_pos[1] + (1 if (int(time.time() * 100) % 2 == 0) else -1) * random.uniform(4, 8), 0, now_pos[3]]
-        now_pos1 = [now_pos[0] + random.uniform(-1.0, +1.0), now_pos[1] + random.uniform(-1.0, +1.0), self.best_above_z * 2, now_pos[3]]
-        if self.use_adc:
-            self._set_fan_speed('heater_fan', self.fan_heat_min_spd)
-        self._set_fan_speed('fan', 0.0)
-        self.public_move(now_pos0, self.rdy_xy_spd / 5)
-        self._env_self_check()
-        out_mms = []
-        old_tri_z_spd = self.tri_z_down_spd
-        old_best_above_z = self.best_above_z
-        for i in range(20):
-            self.public_enable_steps()
-            self._print_msg('RUN_G28_Z', 'Start Coarse Probe, Test Index=%d...' % i)
-            self.public_step_res, self.pres_res = [], []
-            params = self.deal_avgs_prtouch_cmd.send([self.public_pres_oid, 8])
-            self._print_msg('AVGS_RESAULT', str(params))
-            step_cnt_down, step_us_down, acc_ctl_cnt = self.public_get_step_cnts(self.max_z * 1.2, self.tri_z_down_spd * (1.2 if self.use_adc else 2.0))
-            self.start_pres_prtouch_cmd.send([self.public_pres_oid, 0, self.tri_acq_ms, self.public_tri_send_ms, self.tri_need_cnt,
-                                              int(self.tri_hftr_cut*1000),  int(self.tri_lftr_k1 * 1000) if self.use_adc else int(self.tri_lftr_k1 * 1000 * 0.85),
-                                              self.tri_min_hold if self.use_adc else int(self.tri_min_hold * 2), self.tri_max_hold if self.use_adc else int(self.tri_max_hold * 2)])
-            self.public_start_step_prtouch_cmd.send([self.public_step_oid, 0, self.public_tri_send_ms, step_cnt_down, step_us_down, acc_ctl_cnt, self.low_spd_nul, self.send_step_duty, 0])
-            t_last = time.time()
-            while (time.time() - t_last < (self.max_z * 2.0) / (self.tri_z_down_spd * 1.2)) and (len(self.public_step_res) != MAX_BUF_LEN or len(self.pres_res) != MAX_BUF_LEN):
-                self._delay_s(0.010)
-            self.public_start_step_prtouch_cmd.send([self.public_step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
-            self.start_pres_prtouch_cmd.send([self.public_pres_oid, 0, 0, 0, 0, 0, 0, 0, 0])
-            self._ck_and_manual_get_step()
-
-            if len(self.pres_res) == 0:
-                self.gcode.run_script_from_command('FORCE_MOVE STEPPER=stepper_z DISTANCE=-1 VELOCITY=5')
-                self.gcode.run_script_from_command('FORCE_MOVE STEPPER=stepper_z DISTANCE=1 VELOCITY=5')
-
-            out_mm = (self.toolhead.get_position()[2] - (step_cnt_down - self.public_step_res[-1]['step']) * self.mm_per_step) \
-                    if len(self.pres_res) != MAX_BUF_LEN else self._cal_tri_data(step_cnt_down, self.toolhead.get_position()[2], self.public_step_res, self.pres_res)
-
-            self.toolhead.set_position(now_pos0[:2] + [0, now_pos0[3]], homing_axes=[2])
-            self.public_move(now_pos0[:2] + [self.best_above_z * 2, now_pos0[3]], self.tri_z_up_spd * (1.2 if self.use_adc else 2.0))
-            out_mms.append(math.fabs(out_mm))
-            if len(out_mms) > 3:
-                del out_mms[0]
-            _out_mms = list(out_mms)
-            _out_mms.sort()
-            self._print_ary('G28_FIRST_MMS', _out_mms, len(_out_mms), 3)
-            if len(_out_mms) == 3 and (_out_mms[0] + _out_mms[1] < 2.0):
-                break
-            if i == 9:
-                self._print_msg('RUN_G28_Z', 'Out of 5, shake motor...')
-                self.tri_z_down_spd *= 0.40
-                self.best_above_z *= 2
-                self._shake_motor(self.shake_cnt)
-            self._ck_and_raise_error(i == 19, ERR_G28_Z_DETECTION_TIMEOUT)
-        if not accurate:
-            return
-        # 3. Normal probe z
-        self.tri_z_down_spd = old_tri_z_spd
-        self.best_above_z = old_best_above_z
-
-        for i in range(3):
-            self._print_msg('RUN_G28_Z', 'Start Precision Probe...')
-            self.public_move(self.toolhead.get_position()[:2] + [now_pos1[2]], self.rdy_z_spd)
-            self.public_move(now_pos1, self.rdy_xy_spd / 5)
-            self._shake_motor(self.shake_cnt)
-            res_z = self.public_run_step_prtouch(self.max_z * 1.2, self.probe_min_3err, False, 5, 5, True)
-            self.toolhead.set_position(now_pos1[:2] + [self.toolhead.get_position()[2] - res_z, now_pos[3]], homing_axes=[2])
-            self._print_msg('RUN_G28_Z', 'Start Result Check Probe...')
-            self.public_move(now_pos1[:2] + [self.bed_max_err, now_pos[3]], self.rdy_z_spd)
-            ck_z = self.public_run_step_prtouch(self.max_z * 1.2, self.probe_min_3err, False, 3, 3, True)
-            if math.fabs(ck_z) > 1.0:
-                self.tri_z_down_spd *= 0.9
-                self._ck_and_raise_error(i == 2, ERR_G28_Z_DETECTION_ERROR)
-                continue
-            break
-        self.tri_z_down_spd = old_tri_z_spd
-
-        # 4. Set hot temp to old target
-        if self.g28_wait_cool_down:
-            self._print_msg('DEBUG', 'G28_Z: Wait for Nozzle to recovery[%.2f -> %.2f]...' % (self.hot_min_temp, target_temp))
-            self._set_hot_temps(temp=target_temp, wait=target_temp > self.hot_min_temp, err=5)
-        if self.use_adc:
-            self._set_fan_speed('heater_fan', self.fan_heat_max_spd)
-        self._set_step_par(load_sys=True)
-        self.bed_mesh.set_mesh(mesh)
-
     cmd_START_STEP_PRTOUCH_help = "Start the step prtouch."
     def cmd_START_STEP_PRTOUCH(self, gcmd):
         self.public_enable_steps()
@@ -762,12 +594,6 @@ class PRTouchEndstopWrapper:
             self._delay_s(0.010)
         self.public_start_step_prtouch_cmd.send([self.public_step_oid, 0, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
         self._ck_and_raise_error(len(self.public_step_res) != MAX_BUF_LEN, ERR_STEP_LOST_RUN_DATA, [len(self.public_step_res)])
-
-    cmd_COARSE_HOME_Z_help = "Coarse home z"
-    def cmd_COARSE_HOME_Z(self, gcmd):
-        del gcmd
-
-        self._run_G28_Z(False)
 
     cmd_SELF_CHECK_PRTOUCH_help = "Self check the pres."
     def cmd_SELF_CHECK_PRTOUCH(self, gcmd):
