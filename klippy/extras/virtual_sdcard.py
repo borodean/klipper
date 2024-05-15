@@ -55,7 +55,6 @@ class VirtualSD:
         self.count = 0
         self.count_G1 = 0
         self.count_line = 0
-        self.fan_state = ""
         self.cmd_fan = ""
         self.toolhead_moved = False
         self.print_id = ""
@@ -405,10 +404,7 @@ class VirtualSD:
                 next_file_position = self.file_position + len(line) + 1
             self.next_file_position = next_file_position
             try:
-                if line.startswith("M106"):
-                    self.fan_state = line.strip("\r").strip("\n")
                 if self.cmd_fan:
-                    self.fan_state = self.cmd_fan
                     self.cmd_fan = ""
                 if calc_layer_count < 5:
                     for layer_key in LAYER_KEYS:
