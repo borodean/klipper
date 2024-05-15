@@ -52,7 +52,6 @@ class VirtualSD:
         self.gcode.register_command(
             "SDCARD_PRINT_FILE", self.cmd_SDCARD_PRINT_FILE,
             desc=self.cmd_SDCARD_PRINT_FILE_help)
-        self.count = 0
         self.toolhead_moved = False
     def handle_shutdown(self):
         if self.work_timer is not None:
@@ -403,7 +402,6 @@ class VirtualSD:
                         os.system("touch /tmp/layer_count_%s.temp" % self.index)
                 self.toolhead_moved = False
                 self.gcode.run_script(line)
-                self.count += 1
             except self.gcode.error as e:
                 error_message = str(e)
                 try:
@@ -427,7 +425,6 @@ class VirtualSD:
                 lines = []
                 partial_input = ""
         logging.info("Exiting SD card print (position %d)", self.file_position)
-        self.count = 0
         state = {}
         self.work_timer = None
         self.cmd_from_sd = False
