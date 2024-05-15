@@ -6,10 +6,8 @@
 import logging
 import time
 import socket
-from . import probe
 import math
 import random
-import threading
 
 
 PR_VERSION = 307
@@ -360,7 +358,7 @@ class PRTouchEndstopWrapper:
             self.print_msg(title, st, force)
         pass
 
-    def print_res(self, title='None'):
+    def print_res(self):
         t_buf, p_buf = [], []
         for i in range(len(self.step_res)):
             t_buf.append(self.step_res[i]['tick'])
@@ -523,7 +521,7 @@ class PRTouchEndstopWrapper:
         self.print_msg('SHAKE_MOTOR', 'cnt=%d' % cnt)
         now_pos = self.toolhead.get_position()
         max_z_velocity = self.toolhead.kin.max_z_velocity
-        for i in range(int(cnt / 2)):
+        for _ in range(int(cnt / 2)):
             self.gcode.run_script_from_command('G1 X%.2f Y%.2f Z%.2f F%d' % (now_pos[0] - self.shake_range, now_pos[1] - self.shake_range, now_pos[2] - self.shake_range / 2, int(60 * max_z_velocity * 0.25)))
             self.gcode.run_script_from_command('G1 X%.2f Y%.2f Z%.2f F%d' % (now_pos[0] + self.shake_range, now_pos[1] - self.shake_range, now_pos[2] + self.shake_range / 2, int(60 * max_z_velocity * 0.25)))
             self.gcode.run_script_from_command('G1 X%.2f Y%.2f Z%.2f F%d' % (now_pos[0] + self.shake_range, now_pos[1] + self.shake_range, now_pos[2] - self.shake_range / 2, int(60 * max_z_velocity * 0.25)))
@@ -584,7 +582,7 @@ class PRTouchEndstopWrapper:
         l_chs.append(math.sqrt((now_pos[0] - max_y) ** 2 + (now_pos[1] - max_y) ** 2) if (self.pres_tri_chs & 0x08) else max_x * max_y * 2)
         valid_ch = l_chs.index(min(l_chs))
         self.print_msg('VALID_CH', 'Tri_mark=%d best_ch=%d Chs=' % (self.pres_tri_chs, valid_ch) + '  ' + str(l_chs))
-        return valid_ch, l_chs
+        return l_chs
 
     def cal_tri_data(self, start_step, start_pos_z, step_res, pres_res, oft_z=0):
 
@@ -592,7 +590,7 @@ class PRTouchEndstopWrapper:
         self.print_res()
         # 1. Get Best Tri Ch
         max_x, max_y = self.bed_mesh.bmc.mesh_max
-        _valid_ch, l_chs = self.get_valid_ch()
+        l_chs = self.get_valid_ch()
         out_mms = []
         for valid_ch in range(len(l_chs)):
             if l_chs[valid_ch] == max_x * max_y * 2:
@@ -847,7 +845,7 @@ class PRTouchEndstopWrapper:
             self.ck_and_manual_get_pres()
             tri_base_radio += (0 if (self.pres_buf_cnt >= (MAX_BUF_LEN / 2) or self.use_adc) else 0.25)
             self.print_msg('RUN_STEP_PRTOUCH', 'pres_buf_cnt = %d, tri_base_radio = %f' % (self.pres_buf_cnt, tri_base_radio))
-            step_par_down, pres_par_down, tri_time_down = [x for x in self.step_res], [x for x in self.pres_res], [self.pres_tri_time, self.step_tri_time]
+            step_par_down, pres_par_down = [x for x in self.step_res], [x for x in self.pres_res]
             res_z.append(self.cal_tri_data(step_cnt_down, now_pos[2], step_par_down, pres_par_down, -lost_min_cnt * self.mm_per_step))
 
             can_rt = True if (i == 1 and not self.use_adc and math.fabs(res_z[0] - res_z[1]) < 0.05 and crt_cnt != pro_cnt) else False
@@ -964,7 +962,7 @@ class PRTouchEndstopWrapper:
         self.print_msg('BED_MESH_POST_PROC', 'Before=' + str(res1))
 
         # 1. Check Error Point
-        for r in range(3):
+        for _ in range(3):
             res_yx = []
             for l in range(y_cnt):
                 res_yx.append((res1[int(l * x_cnt):int(l * x_cnt + x_cnt)])[::int(1 if (l % 2 == 0) else -1)])
@@ -1024,8 +1022,8 @@ class PRTouchEndstopWrapper:
     def check_bed_mesh(self, auto_g29=True):
         self.print_msg('CK_BED_MESH', 'Start check_bed_mesh()...')
         self.ck_g28ed()
-        min_x, min_y = self.bed_mesh.bmc.mesh_min
-        max_x, max_y = self.bed_mesh.bmc.mesh_max
+        _, min_y = self.bed_mesh.bmc.mesh_min
+        _, max_y = self.bed_mesh.bmc.mesh_max
         mesh = self.bed_mesh.get_mesh()
         self.bed_mesh.set_mesh(None)
         self.print_msg('CK_BED_MESH', 'Start probe_ready()...')
@@ -1149,7 +1147,7 @@ class PRTouchEndstopWrapper:
         self.set_fan_speed('fan', 0.0)
         self.move(now_pos0, self.rdy_xy_spd / 5)
         self.env_self_check()
-        out_mms, lev_z = [], 0
+        out_mms = []
         old_tri_z_spd = self.tri_z_down_spd
         old_best_above_z = self.best_above_z
         for i in range(20):
@@ -1230,7 +1228,6 @@ class PRTouchEndstopWrapper:
         self.print_msg('RUN_RE_G29S', 'Start run_re_g29s()...')
 
         x_cnt = self.bed_mesh.bmc.mesh_config['x_count']
-        y_cnt = self.bed_mesh.bmc.mesh_config['y_count']
         min_x, min_y = self.bed_mesh.bmc.mesh_min
         max_x, max_y = self.bed_mesh.bmc.mesh_max
         home_x = min_x + (max_x - min_x) / 2
@@ -1460,7 +1457,7 @@ class PRTouchEndstopWrapper:
                 self.delay_s(0.010)
             self.start_step_prtouch_cmd.send([self.step_oid, 1, 0, 0, 0, 0, self.low_spd_nul, self.send_step_duty, 0])
             self.start_pres_prtouch_cmd.send([self.pres_oid, 1, 0, 0, 0, 0, 0, 0, 0])
-            self.print_res('cmd_SAFE_DOWN_Z')
+            self.print_res()
             self.ck_and_manual_get_step()
 
         if up_dis != 0:

@@ -3,13 +3,9 @@
 # Copyright (C) 2018-2021  Creality <wangyulong878@sina.com>
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
-import logging
 import time
 import socket
-from . import probe
-import math
 import random
-import threading
 
 
 PR_ERR_CODE_CAL_DATA_ERROR          = {'code':'key401', 'msg':'PR_ERR_CODE_CAL_DATA_ERROR: An error occurred during data calculation..', 'values':[]}
@@ -135,7 +131,6 @@ class ZCompensateInit:
         err_code['msg'] = 'Shutdown due to ' + err_code['msg']
         self.printer.invoke_shutdown(str(err_code))
         raise self.printer.command_error(str(err_code))
-        pass
 
     def move(self, pos, speed, wait=True):
         if not self.shut_down:
