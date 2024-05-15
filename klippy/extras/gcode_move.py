@@ -51,11 +51,8 @@ class GCodeMove:
         self.saved_states = {}
         self.move_transform = self.move_with_transform = None
         self.position_with_transform = (lambda: [0., 0., 0., 0.])
-        self.is_delta = False
         try:
             self.printer_config = config.getsection('printer')
-            if self.printer_config and self.printer_config.get("kinematics") == "delta":
-                self.is_delta = True
         except Exception as err:
             logging.error(err)
     def _handle_ready(self):
