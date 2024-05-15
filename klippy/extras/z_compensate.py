@@ -32,7 +32,6 @@ class ZCompensateInit:
         self.gcode.register_command('CRTENSE_NOZZLE_CLEAR', self.cmd_CR10SE_NOZZLE_CLEAR, desc=self.cmd_CR10SE_NOZZLE_CLEAR_help)
 
         self.vs_start_z_pos     = config.getfloat('vs_start_z_pos', default=3, minval=0, maxval=10)
-        self.show_msg = config.getboolean('show_msg', default=False)
         self.bl_offset = [0,0]
         self.bl_offset[0], self.bl_offset[1] = config.getfloatlist('bl_offset', count=2)
 
@@ -96,7 +95,7 @@ class ZCompensateInit:
         pass
 
     def print_msg(self, title, msg, force=False):
-        if not self.show_msg and not force:
+        if not force:
             return
         if title != 'SHOW_WAVE':
             self.gcode.respond_info('[' + title + ']' + msg)
@@ -156,10 +155,6 @@ class ZCompensateInit:
         self.toolhead.max_accel = self.run_max_accel
         self.toolhead.kin.max_z_velocity = self.run_max_z_velocity
         self.toolhead.kin.max_z_accel = self.run_max_z_accel
-        pass
-    def pnt_msg(self, msg):
-        if self.show_msg:
-            self.gcode.respond_info(msg)
         pass
     def cr10se_clear_nozzle(self, hot_start_temp, hot_rub_temp, hot_end_temp, bed_add_temp):
         min_x, min_y = self.clr_noz_start_x, self.clr_noz_start_y
@@ -251,12 +246,7 @@ class ZCompensateInit:
 
         z_offset_old = self.printer.lookup_object('probe').z_offset
 
-        for i in [0,1]:
-            self.pnt_msg('bl_data[%d]= %f, pr_data[%d] = %f, z_offset[%d] = %f' %(i,bl_data[i][2] - z_offset_old,i, pr_data[i] - z_offset_old, i, z_offset[i]))
-
-
         z_offset_new = (z_offset[0] + z_offset[1])/2 - self.tri_expand_mm
-        self.pnt_msg('z_offset_new = %f ' %(z_offset_new))
 
         self.z_offset_move = z_offset_old - z_offset_new
         self.gcode.run_script_from_command('SET_GCODE_OFFSEt Z_ADJUST=%f MOVE=1' % (self.z_offset_move))
@@ -264,7 +254,6 @@ class ZCompensateInit:
         # #把Z轴补偿写到cfg文件中
         configfile = self.printer.lookup_object('configfile')
         new_calibrate = z_offset_new
-        self.pnt_msg('z_offset_new = %f ' %(new_calibrate))
 
         #如果有错误
         if new_calibrate < 0:

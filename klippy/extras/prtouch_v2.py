@@ -83,7 +83,6 @@ class PRTouchEndstopWrapper:
         self.tri_min_hold       = config.getint('tri_min_hold', default=(3 if self.use_adc else 2000), minval=1, maxval=200000)
         self.tri_max_hold       = config.getint('tri_max_hold', default=(3072 if self.use_adc else 6000), minval=self.tri_min_hold, maxval=600000)
         # 2. Debug Cfg
-        self.show_msg           = config.getboolean('show_msg', default=False)
         # 3. Shake Z Cfg
         self.shake_cnt          = config.getint('shake_cnt', default=8, minval=1, maxval=512)
         self.shake_range        = config.getint('shake_range', default=0.5, minval=0.1, maxval=2)
@@ -332,9 +331,7 @@ class PRTouchEndstopWrapper:
 
     def print_msg(self, title, msg, force=False):
         logging.info('[%s] %s' , title, msg)
-        if not self.show_msg and not force:
-            return
-        if title != 'SHOW_WAVE':
+        if force and title != 'SHOW_WAVE':
             self.gcode.respond_info('[' + title + ']' + msg)
 
     def print_ary(self, title, ary, lent=32, pt_cnt=2, force=False):
@@ -343,7 +340,7 @@ class PRTouchEndstopWrapper:
             st = st + ("%." + ("%df, " % pt_cnt)) % (ary[i])
         st += ']'
         logging.info('[%s] %s' , title, st)
-        if self.show_msg or force:
+        if force:
             self.print_msg(title, st, force)
         pass
 
