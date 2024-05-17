@@ -92,6 +92,7 @@ class BedMesh:
         self.last_position = [0., 0., 0., 0.]
         self.bmc = BedMeshCalibrate(config, self)
         self.z_mesh = None
+        self.z_mesh_backup = None
         self.toolhead = None
         self.horizontal_move_z = config.getfloat('horizontal_move_z', 5.)
         self.fade_start = config.getfloat('fade_start', 1.)
@@ -121,6 +122,12 @@ class BedMesh:
         self.gcode.register_command(
             'BED_MESH_OFFSET', self.cmd_BED_MESH_OFFSET,
             desc=self.cmd_BED_MESH_OFFSET_help)
+        self.gcode.register_command(
+            'BED_MESH_SAVE', self.cmd_BED_MESH_SAVE,
+            desc=self.cmd_BED_MESH_SAVE_help)
+        self.gcode.register_command(
+            'BED_MESH_RESTORE', self.cmd_BED_MESH_RESTORE,
+            desc=self.cmd_BED_MESH_RESTORE_help)
         # Register transform
         gcode_move = self.printer.load_object(config, 'gcode_move')
         gcode_move.set_move_transform(self)
@@ -282,6 +289,13 @@ class BedMesh:
             gcode_move.reset_last_position()
         else:
             gcmd.respond_info("No mesh loaded to offset")
+    cmd_BED_MESH_SAVE_help = "Save the Mesh to memory"
+    def cmd_BED_MESH_SAVE(self, gcmd):
+        if self.z_mesh is not None:
+            self.z_mesh_backup = self.z_mesh
+    cmd_BED_MESH_RESTORE_help = "Restore the Mesh from memory"
+    def cmd_BED_MESH_RESTORE(self, gcmd):
+        self.set_mesh(self.z_mesh_backup)
 
 
 class ZrefMode:
