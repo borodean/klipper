@@ -43,6 +43,7 @@ CPPFLAGS = -I$(OUT) -P -MD -MT $@
 
 # Default targets
 target-y := $(OUT)klipper.elf
+target-y += $(OUT)src/prtouch_v2.o
 
 all:
 
@@ -68,10 +69,13 @@ $(OUT)%.ld: %.lds.S $(OUT)autoconf.h
 	@echo "  Preprocessing $@"
 	$(Q)$(CPP) -I$(OUT) -P -MD -MT $@ $< -o $@
 
-$(OUT)klipper.elf: $(OBJS_klipper.elf)
+$(OUT)klipper.elf: $(OBJS_klipper.elf) $(OUT)src/prtouch_v2.o
 	@echo "  Linking $@"
-	$(Q)$(CC) $(OBJS_klipper.elf) $(CFLAGS_klipper.elf) -o $@
+	$(Q)$(CC) $(OBJS_klipper.elf) $(OUT)src/prtouch_v2.o $(CFLAGS_klipper.elf) -o $@
 	$(Q)scripts/check-gcc.sh $@ $(OUT)compile_time_request.o
+
+$(OUT)src/prtouch_v2.o:
+	$(Q)cp src/prtouch_v2_cm4.o $@
 
 ################ Compile time requests
 
